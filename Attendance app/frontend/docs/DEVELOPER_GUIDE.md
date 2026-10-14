@@ -14,7 +14,9 @@ Local builds use Flutter 3.44.8, Java from Android Studio, and the Android SDK u
 
 The direct Attendance APK linked from AJ's `/login` page is built with `flutter build apk --release --no-pub --dart-define=API_BASE_URL=https://attendance.aryangold.in/api` and copied from `build/app/outputs/flutter-apk/app-release.apk` to AJ's `public/downloads/aryan-attendance.apk`. The current local build has no release keystore and uses debug signing; replace it with the properly release-signed APK before distributing updates to devices with the Play Store signed version installed.
 
-Database dumps, employee roster/payroll exports, the May 2026 PF employee allowlist, uploaded ID-card photos, runtime sessions, local `.env` files, and compiled local build output are excluded from Git. Restore authorized private data from its secure source for a development environment. In particular, payroll reporting needs the private PF allowlist described in `UPSTREAM_DEVELOPER_GUIDE.md`; do not replace it with fabricated records.
+The private repository contains dated development database snapshots in `../../../database/backups/`: `aj_dev-2026-10-14.sql` and `attendance_local-2026-10-14.sql`. They include confidential employee and business records; restrict access and do not copy them into public repositories or environments. Other database dumps, employee roster/payroll exports, the May 2026 PF employee allowlist, uploaded ID-card photos, runtime sessions, local `.env` files, and compiled local build output remain excluded from Git. Restore the optional PF allowlist from its authorized secure source; do not replace it with fabricated records.
+
+To restore a snapshot into a local MySQL/MariaDB server, provide local credentials through the normal client environment and import the file, for example: `mysql -u <local-user> -p < database/backups/attendance_local-2026-10-14.sql`. The dump creates the database named in the file. The AJ snapshot can be imported the same way from `database/backups/aj_dev-2026-10-14.sql`. Keep restored databases local and access-controlled.
 
 The machine's empty Java proxy-host settings prevented Gradle from automatically downloading Android SDK components. Command-line Android tools installed platforms 35 and 36, build tools 35.0.0 and 36.0.0, NDK 28.2.13676358, and CMake 3.22.1. The malformed empty `systemProp.http.proxyHost` and `systemProp.https.proxyHost` entries were removed from the user's `.gradle/gradle.properties`, after preserving a sibling `gradle.properties.attendance-backup`. Other settings were retained, and the Gradle daemon was restarted. Windows desktop builds were disabled only in the local Flutter tool configuration to avoid requiring system Developer Mode for desktop plugin symlinks; platform source remains available.
 
@@ -60,6 +62,7 @@ MariaDB must be running before using database-backed pages. Existing databases w
 
 ## Documentation change log
 
+- 2026-10-14: Added complete local data snapshots for AJ (`aj_dev`) and Attendance (`attendance_local`) to the private repository and documented their confidential handling and restore steps.
 - 2026-10-14: Documented the clean-clone build inputs and the private local data excluded from the project repository.
 - 2026-10-14: Built the direct-download Attendance APK against the hosted API and documented its AJ public download path and signing limitation.
 - 2026-10-10: Added shared motion timing, smoother page and navigation feedback, modal/dropdown transitions, and reduced-motion safeguards to the Attendance administrator web UI.

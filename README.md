@@ -85,9 +85,12 @@ README for APK builds, installation, and the website integration deployment step
 The Attendance Flutter frontend, Laravel API, and migrations are in `Attendance app/`.
 After cloning, follow the [Attendance developer guide](<Attendance app/frontend/docs/DEVELOPER_GUIDE.md>)
 for the local PHP, Composer, MySQL, and Flutter setup, Android emulator API routing,
-and private payroll configuration. Local credentials, employee database exports,
-and payroll records are intentionally excluded from Git; restore authorized
-development data from its secure source when needed.
+and private payroll configuration. This private repository also contains current
+development database snapshots for `aj_dev` and `attendance_local` under
+`database/backups/`. They include real development records and must be handled as
+confidential employee and business data. Local credentials, payroll exports, and
+uploaded documents remain excluded from Git; the optional PF allowlist still must
+come from its authorized secure source.
 
 
 ## How to run
