@@ -49,6 +49,7 @@ storage/
 # Local screenshots, logs, personal exports, and development build artifacts
 .tmp/
 *.log
+/aryan-gold-cpanel-*.zip
 /Attendance app/attendance*.sql
 /Attendance app/locator.sql
 /Attendance app/ActiveMembers_*.csv
