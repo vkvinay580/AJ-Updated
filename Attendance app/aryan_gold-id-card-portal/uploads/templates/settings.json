@@ -1,0 +1,134 @@
+{
+    "front_image": "",
+    "back_image": "",
+    "front": {
+        "logo": {
+            "x": 7,
+            "y": 22,
+            "w": 125,
+            "h": 56,
+            "font": 12,
+            "color": "#ffffff",
+            "align": "center"
+        },
+        "photo": {
+            "x": 170,
+            "y": 75,
+            "w": 142,
+            "h": 181,
+            "font": 14,
+            "color": "#211b1d",
+            "align": "center"
+        },
+        "employee_icon": {
+            "x": 55,
+            "y": 158,
+            "w": 31,
+            "h": 31,
+            "font": 12,
+            "color": "#ffffff",
+            "align": "center"
+        },
+        "calendar_icon": {
+            "x": 55,
+            "y": 270,
+            "w": 31,
+            "h": 31,
+            "font": 12,
+            "color": "#ffffff",
+            "align": "center"
+        },
+        "globe_icon": {
+            "x": 55,
+            "y": 393,
+            "w": 31,
+            "h": 31,
+            "font": 12,
+            "color": "#ffffff",
+            "align": "center"
+        },
+        "full_name": {
+            "x": 151,
+            "y": 294,
+            "w": 174,
+            "h": 45,
+            "font": 23,
+            "color": "#5b0717",
+            "align": "center"
+        },
+        "designation": {
+            "x": 151,
+            "y": 337,
+            "w": 174,
+            "h": 34,
+            "font": 14,
+            "color": "#211b1d",
+            "align": "center"
+        },
+        "employee_code": {
+            "x": 18,
+            "y": 192,
+            "w": 105,
+            "h": 59,
+            "font": 15,
+            "color": "#ffffff",
+            "align": "center"
+        },
+        "date_of_birth": {
+            "x": 12,
+            "y": 305,
+            "w": 118,
+            "h": 61,
+            "font": 14,
+            "color": "#ffffff",
+            "align": "center"
+        },
+        "website": {
+            "x": 4,
+            "y": 432,
+            "w": 140,
+            "h": 48,
+            "font": 8,
+            "color": "#ffffff",
+            "align": "center"
+        },
+        "divider": {
+            "x": 154,
+            "y": 395,
+            "w": 163,
+            "h": 18,
+            "font": 8,
+            "color": "#d6a12f",
+            "align": "center"
+        },
+        "barcode": {
+            "x": 158,
+            "y": 432,
+            "w": 157,
+            "h": 35,
+            "font": 12,
+            "color": "#111111",
+            "align": "center"
+        }
+    },
+    "back": {
+        "blood_group": {
+            "x": 17,
+            "y": 216,
+            "w": 95,
+            "h": 70,
+            "font": 22,
+            "color": "#ffffff",
+            "align": "center"
+        },
+        "company_address": {
+            "x": 160,
+            "y": 149,
+            "w": 158,
+            "h": 180,
+            "font": 13,
+            "color": "#211b1d",
+            "align": "center"
+        }
+    }
+}

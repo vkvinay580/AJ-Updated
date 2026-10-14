@@ -1,0 +1,69 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# Local database and protected uploads
+data/*.db
+data/*.db-*
+storage/
+.env*
+
+# Local screenshots, logs, personal exports, and development build artifacts
+.tmp/
+*.log
+/Attendance app/attendance*.sql
+/Attendance app/locator.sql
+/Attendance app/ActiveMembers_*.csv
+/Attendance app/Backend/ActiveMembers_*.csv
+/Attendance app/Backend/app/Support/data/may-2026-pf-employees.json
+/Attendance app/NPAB FMT ICIC OBED SIR 0906204047.xls
+/Attendance app/PF Calculation sheet.xlsx
+/Attendance app/aryan_gold-id-card-portal/database.sql
+/Attendance app/aryan_gold-id-card-portal/uploads/photos/
+/Attendance app/aryan_gold-id-card-portal/sess_*
+/Attendance app/Backend/production-artifacts/
+/Attendance app/Backend/public_html-no-media-*.zip
+/Attendance app/inactive-feature-production-public_html-fix-*.zip
+/Attendance app/Backend/build/
+/Attendance app/Backend/.phpunit.cache/
+/Attendance app/Backend/public/downloads/*-local.apk
+!.env.example
+!.env.production.example

@@ -1,0 +1,117 @@
+.section-heading.light > p:last-child {
+  color: #aaa79d;
+}
+
+.process-journey + .process-journey {
+  margin-top: 85px;
+}
+
+.process-journey {
+  display: grid;
+  grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr);
+  gap: 58px;
+  align-items: center;
+}
+
+.process-image {
+  position: relative;
+  min-height: 440px;
+  overflow: hidden;
+  border: 1px solid #3a3932;
+}
+
+.process-image::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 70px rgba(0, 0, 0, .28);
+  pointer-events: none;
+}
+
+.process-image img {
+  object-fit: cover;
+}
+
+.process-details .process-grid {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.process-details .process-grid article:nth-child(2) {
+  border-right: 0;
+  margin-right: 0;
+}
+
+.process-details .process-grid article:nth-child(n + 3) {
+  border-top: 1px solid #3a3932;
+}
+
+.process-label {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.process-label > span {
+  width: 42px;
+  height: 42px;
+  border: 1px solid #66582e;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--gold);
+  font-size: calc(12px + 4px);
+  font-weight: 800;
+  flex: 0 0 auto;
+}
+
+.process-label p {
+  margin: 0 0 4px;
+  color: #d9ad43;
+  font-size: calc(10px + 4px);
+  font-weight: 800;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+}
+
+.process-label h3 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: calc(24px + 4px);
+  font-weight: 500;
+}
+
+@media (max-width: 560px) {
+  .process-journey + .process-journey {
+    margin-top: 55px;
+  }
+}
+
+@media (max-width: 900px) {
+  .process-journey {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .process-journey:nth-of-type(3) .process-image {
+    order: -1;
+  }
+
+  .process-image {
+    min-height: 390px;
+  }
+}
+
+@media (max-width: 560px) {
+  .process-image {
+    min-height: 300px;
+  }
+
+  .process-details .process-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .process-details .process-grid article:nth-child(2) {
+    border-bottom: 1px solid #3a3932;
+  }
+}

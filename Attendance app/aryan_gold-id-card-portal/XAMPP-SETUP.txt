@@ -1,0 +1,42 @@
+ARYAN GOLD ID CARD PORTAL — XAMPP LOCAL TEST SETUP
+================================================
+
+1. Install and open XAMPP Control Panel.
+2. Start Apache and MySQL.
+3. Copy the folder "aryan_gold-id-card-portal" into:
+
+   Windows: C:\xampp\htdocs\
+
+4. Open this URL in your browser:
+
+   http://localhost/aryan_gold-id-card-portal/install.php
+
+5. Enter an administrator name, email, and a password with at least 8 characters.
+   The installer automatically creates the database "aryan_gold_id_portal" and its tables.
+
+6. Admin login:
+
+   http://localhost/aryan_gold-id-card-portal/admin/login.php
+
+7. Employee form:
+
+   http://localhost/aryan_gold-id-card-portal/
+
+DEFAULT XAMPP DATABASE SETTINGS
+-------------------------------
+Host: 127.0.0.1
+Port: 3306
+Database: aryan_gold_id_portal
+Username: root
+Password: blank
+
+These settings are already configured in config.php.
+
+TROUBLESHOOTING
+---------------
+- If MySQL uses a password, edit config.php and set the value under db > pass.
+- If the folder name changes, update base_url in config.php.
+- If Apache uses another port, use a URL such as http://localhost:8080/aryan_gold-id-card-portal/.
+- Enable the PHP extensions pdo_mysql and fileinfo in XAMPP if they are disabled.
+- Uploaded photos are stored in uploads/photos/.
+- For local testing, install.php can remain. Delete or rename it before production deployment.

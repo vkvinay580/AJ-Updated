@@ -1,0 +1,5 @@
+Options -Indexes
+
+<FilesMatch "^(config\.php|config\.example\.php|database\.sql|README\.md|XAMPP-SETUP\.txt)$">
+  Require all denied
+</FilesMatch>
