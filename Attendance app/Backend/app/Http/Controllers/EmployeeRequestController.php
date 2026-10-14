@@ -25,7 +25,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
-use Intervention\Image\Facades\Image;
+use Intervention\Image\Laravel\Facades\Image;
 
 class EmployeeRequestController extends Controller
 {
@@ -864,7 +864,7 @@ class EmployeeRequestController extends Controller
             $extension
         );
 
-        Image::make($image)
+        Image::read($image)
             ->resize(256, 256)
             ->save($directory.'/'.$filename);
 
@@ -1040,12 +1040,8 @@ class EmployeeRequestController extends Controller
             $extension
         );
 
-        Image::make($image)
-            ->orientate()
-            ->resize(1400, null, function ($constraint): void {
-                $constraint->aspectRatio();
-                $constraint->upsize();
-            })
+        Image::read($image)
+            ->scaleDown(width: 1400)
             ->save($directory.'/'.$filename);
 
         return 'storage/PassbookDocs/'.$filename;

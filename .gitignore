@@ -43,7 +43,8 @@ next-env.d.ts
 # Local database and protected uploads
 data/*.db
 data/*.db-*
-storage/
+/storage/
+/database/backups/*.sql
 .env*
 
 # Local screenshots, logs, personal exports, and development build artifacts

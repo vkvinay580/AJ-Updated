@@ -24,7 +24,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
-use Intervention\Image\Facades\Image;
+use Illuminate\Validation\Rules\Password;
+use Intervention\Image\Laravel\Facades\Image;
 
 
 class AdminController extends Controller
@@ -35,7 +36,6 @@ class AdminController extends Controller
     private const STATUS_SINGLE_PUNCH = 'single_punch';
     private const STATUS_ABSENT = 'absent';
     private const THEME_COOKIE_NAME = 'admin_theme_preferences';
-    private const DEFAULT_CREATED_ADMIN_PASSWORD = '12345678';
     private const DEFAULT_ADMIN_THEME = 'aryan-gold-theme';
 
     private const THEME_OPTIONS = [
@@ -1240,6 +1240,7 @@ class AdminController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:admins,email'],
             'position' => ['required', 'string', 'max:255'],
+            'password' => ['required', 'confirmed', Password::min(12)->mixedCase()->letters()->numbers()->symbols()],
             'role' => ['required', Rule::in(array_keys($this->manageableRoleOptions()))],
             'sidebar_menu_permissions' => ['nullable', 'array'],
             'sidebar_menu_permissions.*' => ['string', Rule::in(AdminMenu::allKeys())],
@@ -1261,8 +1262,8 @@ class AdminController extends Controller
             $admin->{$field} = $themeDefaults[$field] ?? null;
         }
 
-        $admin->password = Hash::make(self::DEFAULT_CREATED_ADMIN_PASSWORD);
-        $admin->password_hint = self::DEFAULT_CREATED_ADMIN_PASSWORD;
+        $admin->password = Hash::make($data['password']);
+        $admin->password_hint = '';
         $admin->role = trim((string) $data['role']);
         $admin->position = trim((string) $data['position']);
         $admin->sidebar_menu_permissions = AdminMenu::normalizeKeys($data['sidebar_menu_permissions'] ?? []);
@@ -1765,7 +1766,7 @@ class AdminController extends Controller
 
         $filename = 'admin' . time() . '.' . $image->getClientOriginalExtension();
 
-        Image::make($image)->resize(256, 256)->save($directory.'/'.$filename);
+        Image::read($image)->resize(256, 256)->save($directory.'/'.$filename);
 
         return $filename;
     }

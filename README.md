@@ -42,7 +42,12 @@ DB_NAME=your-database-name
 DATA_ENCRYPTION_KEY=replace-with-a-long-random-secret
 INITIAL_ADMIN_EMAIL=your-admin@example.com
 INITIAL_ADMIN_PASSWORD=replace-with-a-strong-unique-password
+NEXT_PUBLIC_SITE_URL=https://aryangold.in
+ATTENDANCE_API_URL=https://attendance.aryangold.in/api
+BRANCH_PORTAL_URL=https://biz.aryangold.in
 ```
+
+`NEXT_PUBLIC_SITE_URL` drives canonical metadata, the sitemap, robots file, and origin validation. Create DNS and TLS for the attendance and branch subdomains before publishing the Android apps. The Attendance production database and Laravel settings are documented in `Attendance app/Backend/.env.production.example`; keep real credentials only in the hosting environment.
 
 Back up the database, `storage/kyc`, `storage/pledges`, and `storage/chat` together. Private documents and chat attachments are never placed in the public directory.
 
@@ -71,6 +76,8 @@ npm run lint
 npm run build
 ```
 
+The database initializer is idempotent and upgrades an existing AJ schema in place. Run it against a backed-up database before restarting production. Apply Laravel migrations separately from `Attendance app/Backend` with `php artisan migrate --force`. An empty Attendance database uses the committed schema-only bootstrap; employee, branch, credential, and administrator records must be provisioned separately by an authorized operator.
+
 For the prepared cPanel workflow, see [DEPLOY_CPANEL.md](./DEPLOY_CPANEL.md).
 
 ## Android app
@@ -85,12 +92,9 @@ README for APK builds, installation, and the website integration deployment step
 The Attendance Flutter frontend, Laravel API, and migrations are in `Attendance app/`.
 After cloning, follow the [Attendance developer guide](<Attendance app/frontend/docs/DEVELOPER_GUIDE.md>)
 for the local PHP, Composer, MySQL, and Flutter setup, Android emulator API routing,
-and private payroll configuration. This private repository also contains current
-development database snapshots for `aj_dev` and `attendance_local` under
-`database/backups/`. They include real development records and must be handled as
-confidential employee and business data. Local credentials, payroll exports, and
-uploaded documents remain excluded from Git; the optional PF allowlist still must
-come from its authorized secure source.
+and private payroll configuration. Database dumps, local credentials, payroll exports,
+and uploaded documents must remain outside Git. The optional PF allowlist must come
+from its authorized secure source.
 
 
 ## How to run
@@ -104,6 +108,4 @@ npm install
 npm run dev
 ```
 
-The 
-ode_modules, .next, dist, and other generated dependency/build folders are intentionally not committed; recreate them with the commands above.
-
+The `node_modules`, `.next`, `dist`, and other generated dependency/build folders are intentionally not committed; recreate them with the commands above.

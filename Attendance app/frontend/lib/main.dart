@@ -65,7 +65,7 @@ class _NortonEmulatorHttpOverrides extends HttpOverrides {
   HttpClient createHttpClient(SecurityContext? context) {
     final client = super.createHttpClient(context);
     client.badCertificateCallback = (certificate, host, port) {
-      return host.toLowerCase() == 'aryangold.app' &&
+      return host.toLowerCase() == 'attendance.aryangold.in' &&
           certificate.issuer.contains('Norton Web/Mail Shield Root');
     };
     return client;
@@ -1497,11 +1497,8 @@ class BiometricAppLock {
     try {
       return await _localAuthentication.authenticate(
         localizedReason: reason,
-        options: const AuthenticationOptions(
-          biometricOnly: true,
-          stickyAuth: true,
-          useErrorDialogs: true,
-        ),
+        biometricOnly: true,
+        persistAcrossBackgrounding: true,
       );
     } catch (_) {
       return false;
@@ -1775,18 +1772,22 @@ ThemeData _birthdayAppTheme(BuildContext context) {
 
 class ApiConfig {
   static const localBaseUrl = 'http://127.0.0.1:8000/api';
-  static const hostedBaseUrl = 'https://aryangold.app/api';
-  static const legacyHostedBaseUrl = 'https://abhibs.in/api';
+  static const hostedBaseUrl = 'https://attendance.aryangold.in/api';
+  static const retiredHostedBaseUrls = <String>[
+    'https://aryangold.app/api',
+    'https://abhibs.in/api',
+  ];
   static const legacyEmulatorBaseUrl = 'http://10.0.2.2:8000/api';
 
-  // Fresh builds use the local backend. Select deployment endpoints explicitly
-  // with --dart-define=API_BASE_URL=https://your-host/api.
+  // Production is the safe default. Local builds select their backend explicitly
+  // with --dart-define=API_BASE_URL=http://127.0.0.1:8000/api.
   static const defaultBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: localBaseUrl,
+    defaultValue: hostedBaseUrl,
   );
-  static const _preferencesKey = 'api_base_url_v3';
+  static const _preferencesKey = 'api_base_url_v4';
   static const _legacyPreferencesKeys = <String>[
+    'api_base_url_v3',
     'api_base_url_v2',
     'api_base_url',
   ];
@@ -1798,17 +1799,20 @@ class ApiConfig {
 
   static Future<void> load() async {
     final preferences = await SharedPreferences.getInstance();
-    final savedValue = preferences.getString(_preferencesKey);
+    String? savedValue = preferences.getString(_preferencesKey);
+    for (final key in _legacyPreferencesKeys) {
+      savedValue ??= preferences.getString(key);
+    }
     final normalizedSavedValue = savedValue == null
         ? null
         : normalize(savedValue);
     final normalized = normalizedSavedValue == null
         ? resolvedDefaultBaseUrl
-        : _migrateLegacyHostedBaseUrl(normalizedSavedValue);
+        : _migrateRetiredHostedBaseUrl(normalizedSavedValue);
 
     _baseUrl = normalized;
 
-    if (savedValue != null && savedValue != normalized) {
+    if (savedValue != null || preferences.containsKey(_preferencesKey)) {
       await preferences.setString(_preferencesKey, normalized);
     }
 
@@ -1861,8 +1865,8 @@ class ApiConfig {
     return _normalizeLoopbackUri(parsed).toString();
   }
 
-  static String _migrateLegacyHostedBaseUrl(String value) {
-    if (value == normalize(legacyHostedBaseUrl)) {
+  static String _migrateRetiredHostedBaseUrl(String value) {
+    if (retiredHostedBaseUrls.any((url) => value == normalize(url))) {
       return resolvedDefaultBaseUrl;
     }
 
@@ -3595,7 +3599,7 @@ class EmployeeSessionStore {
   static const _savedPasswordKey = 'employee_portal_saved_password';
   static const _rememberCredentialsKey = 'employee_portal_remember_credentials';
   static const _secureStorage = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    aOptions: AndroidOptions(migrateWithBackup: true),
   );
   static const Duration _secureStorageTimeout = Duration(seconds: 2);
 

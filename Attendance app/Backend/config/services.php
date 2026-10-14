@@ -41,7 +41,9 @@ return [
     ],
 
     'aryangold_employee_sync' => [
-        'url' => env('ARYANGOLD_EMPLOYEE_SYNC_URL', 'https://aryangold.biz/api/employee-sync.php'),
+        // The AJ portal now reads the Attendance business API directly. Keep the
+        // legacy outbound sync disabled unless a compatible endpoint is supplied.
+        'url' => env('ARYANGOLD_EMPLOYEE_SYNC_URL', ''),
         'token' => env('ARYANGOLD_EMPLOYEE_SYNC_TOKEN'),
         'timeout' => env('ARYANGOLD_EMPLOYEE_SYNC_TIMEOUT', 15),
     ],

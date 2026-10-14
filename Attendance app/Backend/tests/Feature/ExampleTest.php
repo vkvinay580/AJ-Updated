@@ -12,10 +12,21 @@ class ExampleTest extends TestCase
      *
      * @return void
      */
-    public function test_the_application_returns_a_successful_response()
+    public function test_the_android_update_endpoint_returns_release_metadata(): void
     {
-        $response = $this->get('/');
+        $response = $this->getJson('/api/app/update');
 
-        $response->assertStatus(200);
+        $response
+            ->assertOk()
+            ->assertJsonPath('update.platform', 'android')
+            ->assertJsonPath('update.packageName', 'aryan.attendance')
+            ->assertJsonStructure([
+                'update' => [
+                    'latestVersion',
+                    'latestBuildNumber',
+                    'minimumSupportedBuildNumber',
+                    'downloadUrl',
+                ],
+            ]);
     }
 }

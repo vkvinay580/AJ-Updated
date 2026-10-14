@@ -175,7 +175,7 @@
             <h2>4. Data Storage and Security</h2>
             <ul>
                 <li>Your session token and basic profile data are stored locally on your device using secure shared preferences.</li>
-                <li>Attendance records, face photos, and location data are transmitted to and stored on our backend server (aryangold.app).</li>
+                <li>Attendance records, face photos, and location data are transmitted to and stored on our backend server (attendance.aryangold.in).</li>
                 <li>All data transmission is performed over HTTPS where possible.</li>
                 <li>We take reasonable measures to protect your data from unauthorized access, loss, or misuse.</li>
             </ul>
@@ -220,7 +220,7 @@
                 If you have any questions or concerns about this Privacy Policy, please contact your system administrator
                 or reach us at:
             </p>
-            <p>Website: <a href="https://aryangold.app">https://aryangold.app</a></p>
+            <p>Website: <a href="https://attendance.aryangold.in">https://attendance.aryangold.in</a></p>
         </article>
     </main>
 </body>

@@ -53,7 +53,36 @@
                             <input type="text" class="form-control" name="position" id="position"
                                 value="{{ old('position') }}" placeholder="Branch Manager" required>
                         </div>
+
+                        <div class="col-md-6">
+                            <label for="role" class="form-label">Admin Type</label>
+                            <select name="role" id="role" class="form-select" required>
+                                @foreach ($roleOptions as $value => $label)
+                                    <option value="{{ $value }}" @selected(old('role', \App\Models\Admin::ROLE_HIRING) === $value)>
+                                        {{ $label }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="password" class="form-label">Temporary Password</label>
+                            <input type="password" class="form-control" name="password" id="password"
+                                autocomplete="new-password" minlength="12" required>
+                            <div class="form-text">Use at least 12 characters with upper and lower case letters, a number, and a symbol.</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="password_confirmation" class="form-label">Confirm Temporary Password</label>
+                            <input type="password" class="form-control" name="password_confirmation"
+                                id="password_confirmation" autocomplete="new-password" minlength="12" required>
+                        </div>
                     </div>
+
+                    @include('admin.partials.sidebar_menu_permissions', [
+                        'menuGroups' => $menuGroups,
+                        'selectedMenuKeys' => $selectedMenuKeys,
+                    ])
 
                     <div class="mt-4 pt-3 border-top">
                         <button type="submit" class="btn btn-grd-primary px-4">Create Admin</button>

@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
-use Intervention\Image\Facades\Image;
+use Intervention\Image\Laravel\Facades\Image;
 
 class TeTrackerController extends Controller
 {
@@ -384,8 +384,7 @@ class TeTrackerController extends Controller
             $extension
         );
 
-        Image::make($image)
-            ->orientate()
+        Image::read($image)
             ->resize(512, 512)
             ->save($directory.'/'.$filename);
 

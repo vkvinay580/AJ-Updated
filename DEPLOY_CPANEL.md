@@ -60,6 +60,23 @@ Click **Restart Application** in cPanel. Then verify:
 
 Deploy the Laravel Attendance app at `https://attendance.aryangold.in` and set its `ARYANGOLD_BUSINESS_INTEGRATION_KEY` to the same secret. The browser never calls this integration directly; AJ performs all employee, assignment, and login verification server-to-server.
 
+When cPanel requires the Attendance document root to live below the main `public_html` directory, retain the repository's root `.htaccess` host exclusion for `attendance.aryangold.in`. It prevents the main Next.js reverse proxy from intercepting Laravel requests while leaving `aryangold.in` and `biz.aryangold.in` on the Node.js application. The root and Laravel `public/.htaccess` files redirect public requests to HTTPS while keeping HTTP ACME challenge paths available for certificate renewal.
+
+Before deploying either application, create DNS records and AutoSSL certificates for `aryangold.in`, `attendance.aryangold.in`, and `biz.aryangold.in`. The attendance and branch subdomains will not work until those records resolve to the hosting account.
+
+For Attendance, copy the variable names from `Attendance app/Backend/.env.production.example` into the hosting environment, set the assigned production database name/user/password, preserve the existing `APP_KEY`, and run:
+
+```bash
+composer install --no-dev --optimize-autoloader
+php artisan optimize:clear
+php artisan migrate --force
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+```
+
+Verify `https://attendance.aryangold.in/api/app/update` before distributing the Attendance APK. The AJ database and Attendance database remain separate; back up both before applying schema changes.
+
 Enable **AutoSSL** for the domain before accepting real KYC documents. Camera capture requires HTTPS on deployed sites.
 
 ## Persistent files and backups

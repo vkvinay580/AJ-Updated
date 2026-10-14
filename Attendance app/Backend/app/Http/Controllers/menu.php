@@ -6,8 +6,8 @@ $releaseChatUnreadCount = 0;
 $username = $_SESSION['employeeId'] ?? '';
 $branchId  = $_SESSION['branchCode'] ?? '';
 $attendanceBranchId = trim((string) ($_SESSION['branchCode'] ?? ''));
-$attendanceUrl = 'https://aryangold.app/?fresh_login=1';
-$vmAttendanceUrl = 'https://aryangold.app/admin/vm-login';
+$attendanceUrl = 'https://attendance.aryangold.in/?fresh_login=1';
+$vmAttendanceUrl = 'https://attendance.aryangold.in/admin/vm-login';
 $vmAssignedBranches = $_SESSION['vmAssignedBranches']
     ?? $_SESSION['vm_assigned_branches']
     ?? $_SESSION['assignedBranches']
@@ -358,4 +358,3 @@ document.addEventListener('DOMContentLoaded', function () {
   })(jQuery);
 });
 </script>
-

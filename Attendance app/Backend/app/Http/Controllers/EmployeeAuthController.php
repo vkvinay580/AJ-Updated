@@ -21,7 +21,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
-use Intervention\Image\Facades\Image;
+use Intervention\Image\Laravel\Facades\Image;
 
 class EmployeeAuthController extends Controller
 {
@@ -801,9 +801,8 @@ class EmployeeAuthController extends Controller
             $extension
         );
 
-        Image::make($image)
-            ->orientate()
-            ->fit(512, 512)
+        Image::read($image)
+            ->cover(512, 512)
             ->save($directory . '/' . $filename);
 
         return 'storage/ProfileImage/' . $filename;

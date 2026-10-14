@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 |--------------------------------------------------------------------------
 | CONFIG
 |--------------------------------------------------------------------------
-| Fill these values for aryangold.biz before upload.
+| Fill these values for biz.aryangold.in before upload.
 */
 $DB_HOST = 'localhost';
 $DB_NAME = 'your_database_name';

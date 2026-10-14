@@ -4,6 +4,7 @@ import { CartProvider } from "@/context/CartContext";
 import { RealtimeSync } from "@/components/realtime/RealtimeSync";
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Manrope } from "next/font/google";
+import { getSiteUrl } from "@/lib/site-url";
 import "./globals.css";
 import "./process.css";
 import "./hero-orbit.css";
@@ -17,7 +18,7 @@ const manrope = Manrope({
 const cormorant = Cormorant_Garamond({ variable: "--font-display", subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://aryangold.in"),
+  metadataBase: new URL(getSiteUrl()),
   title: { default: "Aryan Gold | Gold & Silver Buyers in Bengaluru", template: "%s | Aryan Gold" },
   description: "Buy and sell gold and silver bars, coins, and jewellery with transparent valuation, secure transactions, and professional service in Bengaluru.",
   applicationName: "Aryan Gold",

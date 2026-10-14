@@ -801,7 +801,7 @@ class RecruitmentController extends Controller
             $syncResult = $employeeSyncService->sync($employee, $branch);
 
             if (($syncResult['synced'] ?? false) === true) {
-                $message .= ' Employee successfully added to Business Software @ aryangold.biz.';
+                $message .= ' Employee successfully added to Business Software @ biz.aryangold.in.';
             } elseif (($syncResult['enabled'] ?? false) === false) {
                 $message .= ' aryan_goldgold sync is not configured.';
                 $alertType = 'warning';

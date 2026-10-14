@@ -1,34 +1,32 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:html' as html;
+import 'dart:js_interop';
 import 'dart:typed_data';
 
+import 'package:web/web.dart' as web;
+
 bool hasFinePointerForAttendance() {
-  return html.window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  return web.window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 }
 
 bool hasTouchInputForAttendance() {
-  return (html.window.navigator.maxTouchPoints ?? 0) > 0 ||
-      html.window.matchMedia('(any-pointer: coarse)').matches ||
-      html.window.matchMedia('(pointer: coarse)').matches;
+  return web.window.navigator.maxTouchPoints > 0 ||
+      web.window.matchMedia('(any-pointer: coarse)').matches ||
+      web.window.matchMedia('(pointer: coarse)').matches;
 }
 
 void clearFreshLoginBrowserStorage() {
-  html.window.localStorage.clear();
-  html.window.sessionStorage.clear();
+  web.window.localStorage.clear();
+  web.window.sessionStorage.clear();
 }
 
 Future<Uint8List?> capturePhotoWithBrowserCamera({
   String facingMode = 'user',
 }) async {
-  if (html.window.navigator.mediaDevices == null) {
-    throw StateError('Camera access is not supported in this browser.');
-  }
-
   final completer = Completer<Uint8List?>();
-  html.MediaStream? stream;
+  web.MediaStream? stream;
 
-  final overlay = html.DivElement()
+  final overlay = web.HTMLDivElement()
     ..style.position = 'fixed'
     ..style.left = '0'
     ..style.top = '0'
@@ -43,21 +41,21 @@ Future<Uint8List?> capturePhotoWithBrowserCamera({
     ..style.padding = '20px'
     ..style.boxSizing = 'border-box';
 
-  final title = html.DivElement()
-    ..text = 'Camera Capture'
+  final title = web.HTMLDivElement()
+    ..textContent = 'Camera Capture'
     ..style.color = '#ffffff'
     ..style.fontSize = '20px'
     ..style.fontWeight = '700'
     ..style.marginBottom = '12px';
 
-  final videoWrap = html.DivElement()
+  final videoWrap = web.HTMLDivElement()
     ..style.width = 'min(720px, 100%)'
     ..style.maxHeight = '70vh'
     ..style.borderRadius = '18px'
     ..style.overflow = 'hidden'
     ..style.background = '#111111';
 
-  final video = html.VideoElement()
+  final video = web.HTMLVideoElement()
     ..autoplay = true
     ..muted = true
     ..style.width = '100%'
@@ -65,22 +63,22 @@ Future<Uint8List?> capturePhotoWithBrowserCamera({
     ..style.objectFit = 'cover';
   video.setAttribute('playsinline', 'true');
 
-  final error = html.DivElement()
+  final error = web.HTMLDivElement()
     ..style.color = '#fecaca'
     ..style.marginTop = '12px'
     ..style.maxWidth = '720px'
     ..style.textAlign = 'center';
 
-  final actions = html.DivElement()
+  final actions = web.HTMLDivElement()
     ..style.display = 'flex'
     ..style.gap = '12px'
     ..style.flexWrap = 'wrap'
     ..style.justifyContent = 'center'
     ..style.marginTop = '18px';
 
-  html.ButtonElement button(String text) {
-    return html.ButtonElement()
-      ..text = text
+  web.HTMLButtonElement button(String text) {
+    return web.HTMLButtonElement()
+      ..textContent = text
       ..style.border = '0'
       ..style.borderRadius = '999px'
       ..style.padding = '12px 20px'
@@ -100,62 +98,79 @@ Future<Uint8List?> capturePhotoWithBrowserCamera({
       return;
     }
 
-    stream?.getTracks().forEach((track) => track.stop());
+    for (final track in stream?.getTracks().toDart ?? const []) {
+      track.stop();
+    }
     overlay.remove();
     completer.complete(bytes);
   }
 
-  closeButton.onClick.listen((_) => finish(null));
+  closeButton.addEventListener('click', ((web.Event _) => finish(null)).toJS);
 
-  captureButton.onClick.listen((_) {
-    try {
-      final width = video.videoWidth;
-      final height = video.videoHeight;
+  captureButton.addEventListener(
+    'click',
+    ((web.Event _) {
+      try {
+        final width = video.videoWidth;
+        final height = video.videoHeight;
 
-      if (width <= 0 || height <= 0) {
-        error.text = 'Camera is not ready yet. Please try again.';
-        return;
+        if (width <= 0 || height <= 0) {
+          error.textContent = 'Camera is not ready yet. Please try again.';
+          return;
+        }
+
+        final canvas = web.HTMLCanvasElement()
+          ..width = width
+          ..height = height;
+        final context = canvas.getContext('2d') as web.CanvasRenderingContext2D;
+        context.drawImage(video, 0, 0, width, height);
+
+        final dataUrl = canvas.toDataURL('image/jpeg', 0.88.toJS);
+        final commaIndex = dataUrl.indexOf(',');
+
+        if (commaIndex < 0) {
+          error.textContent = 'Unable to capture photo.';
+          return;
+        }
+
+        finish(base64Decode(dataUrl.substring(commaIndex + 1)));
+      } catch (_) {
+        error.textContent = 'Unable to capture photo.';
       }
+    }).toJS,
+  );
 
-      final canvas = html.CanvasElement(width: width, height: height);
-      final context = canvas.context2D;
-      context.drawImageScaled(video, 0, 0, width, height);
+  videoWrap.appendChild(video);
+  actions
+    ..appendChild(captureButton)
+    ..appendChild(closeButton);
+  overlay
+    ..appendChild(title)
+    ..appendChild(videoWrap)
+    ..appendChild(error)
+    ..appendChild(actions);
+  web.document.body?.appendChild(overlay);
 
-      final dataUrl = canvas.toDataUrl('image/jpeg', 0.88);
-      final commaIndex = dataUrl.indexOf(',');
-
-      if (commaIndex < 0) {
-        error.text = 'Unable to capture photo.';
-        return;
-      }
-
-      finish(base64Decode(dataUrl.substring(commaIndex + 1)));
-    } catch (_) {
-      error.text = 'Unable to capture photo.';
-    }
-  });
-
-  videoWrap.children.add(video);
-  actions.children.addAll([captureButton, closeButton]);
-  overlay.children.addAll([title, videoWrap, error, actions]);
-  html.document.body?.append(overlay);
-
-  Future<html.MediaStream> openStream(Map<String, dynamic> constraints) {
-    return html.window.navigator.mediaDevices!.getUserMedia(constraints);
+  Future<web.MediaStream> openStream(web.MediaStreamConstraints constraints) {
+    return web.window.navigator.mediaDevices.getUserMedia(constraints).toDart;
   }
 
   try {
-    stream = await openStream({
-      'audio': false,
-      'video': {
-        'facingMode': {'ideal': facingMode},
-        'width': {'ideal': 1280},
-        'height': {'ideal': 720},
-      },
-    });
+    stream = await openStream(
+      web.MediaStreamConstraints(
+        audio: false.toJS,
+        video: <String, Object>{
+          'facingMode': <String, String>{'ideal': facingMode},
+          'width': <String, int>{'ideal': 1280},
+          'height': <String, int>{'ideal': 720},
+        }.jsify()!,
+      ),
+    );
   } catch (_) {
     try {
-      stream = await openStream({'audio': false, 'video': true});
+      stream = await openStream(
+        web.MediaStreamConstraints(audio: false.toJS, video: true.toJS),
+      );
     } catch (error) {
       overlay.remove();
       final normalizedError = error.toString().toLowerCase();
@@ -185,7 +200,7 @@ Future<Uint8List?> capturePhotoWithBrowserCamera({
   video.srcObject = stream;
 
   try {
-    await video.play();
+    await video.play().toDart;
   } catch (_) {
     // Some browsers start playback automatically after srcObject is assigned.
   }

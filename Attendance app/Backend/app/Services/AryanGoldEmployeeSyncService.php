@@ -8,10 +8,6 @@ use Illuminate\Support\Facades\Http;
 
 class AryanGoldEmployeeSyncService
 {
-    private const LEGACY_URL = 'https://aryangold.in/api/employee-sync.php';
-
-    private const DEFAULT_URL = 'https://aryangold.biz/api/employee-sync.php';
-
     public function sync(Employee $employee, ?Branch $branch = null): array
     {
         $url = $this->syncUrl();
@@ -46,9 +42,7 @@ class AryanGoldEmployeeSyncService
 
     private function syncUrl(): string
     {
-        $url = rtrim(trim((string) config('services.aryangold_employee_sync.url')), '/');
-
-        return strcasecmp($url, self::LEGACY_URL) === 0 ? self::DEFAULT_URL : $url;
+        return rtrim(trim((string) config('services.aryangold_employee_sync.url')), '/');
     }
 
     private function payload(Employee $employee, ?Branch $branch = null): array

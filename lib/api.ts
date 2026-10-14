@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { getSiteUrl } from "@/lib/site-url";
 
 export function apiError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
@@ -16,16 +17,7 @@ export function cleanText(value: unknown, max = 200) {
 export function sameOrigin(request: NextRequest) {
   const origin = request.headers.get("origin");
   if (!origin) return true;
-  const allowedOrigins = new Set([request.nextUrl.origin]);
-  const publicSiteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-
-  if (publicSiteUrl) {
-    try {
-      allowedOrigins.add(new URL(publicSiteUrl).origin);
-    } catch {
-      // Ignore an invalid deployment value and retain the request-origin check.
-    }
-  }
+  const allowedOrigins = new Set([request.nextUrl.origin, getSiteUrl()]);
 
   const forwardedHost = request.headers.get("x-forwarded-host");
   const forwardedProto = request.headers.get("x-forwarded-proto");

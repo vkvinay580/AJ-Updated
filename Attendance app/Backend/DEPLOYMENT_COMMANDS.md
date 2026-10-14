@@ -40,7 +40,7 @@ If the server does not provide `php` directly, use the hosting provider's PHP 8.
 
 
 
-1. Sign in to `https://aryangold.app/admin/employee/index` with an authorized administrator account.
+1. Sign in to `https://attendance.aryangold.in/admin/employee/index` with an authorized administrator account.
 
 2. Confirm the page opens without the **Allowed memory size exhausted** error.
 

@@ -18,7 +18,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
-use Intervention\Image\Facades\Image;
+use Intervention\Image\Laravel\Facades\Image;
 
 class AttendanceController extends Controller
 {
@@ -1057,8 +1057,7 @@ class AttendanceController extends Controller
             $extension
         );
 
-        Image::make($image)
-            ->orientate()
+        Image::read($image)
             ->resize(256, 256)
             ->save($directory.'/'.$filename);
 
@@ -1085,12 +1084,8 @@ class AttendanceController extends Controller
             $extension
         );
 
-        Image::make($image)
-            ->orientate()
-            ->resize(512, 512, function ($constraint): void {
-                $constraint->aspectRatio();
-                $constraint->upsize();
-            })
+        Image::read($image)
+            ->scaleDown(width: 512, height: 512)
             ->save($directory.'/'.$filename);
 
         return 'storage/AttendanceFraudProof/'.$filename;
@@ -1554,4 +1549,3 @@ class AttendanceController extends Controller
         ], 423);
     }
 }
-

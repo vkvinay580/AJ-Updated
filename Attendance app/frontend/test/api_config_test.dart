@@ -11,11 +11,11 @@ void main() {
   });
 
   test(
-    'fresh installation uses the local backend unless explicitly defined',
+    'fresh installation uses the production backend unless explicitly defined',
     () async {
       const configured = String.fromEnvironment(
         'API_BASE_URL',
-        defaultValue: 'http://127.0.0.1:8000/api',
+        defaultValue: ApiConfig.hostedBaseUrl,
       );
 
       await ApiConfig.load();
@@ -39,17 +39,35 @@ void main() {
     },
   );
 
-  test('retired hosted endpoint migrates to the configured backend', () async {
+  test('retired hosted endpoints migrate to the configured backend', () async {
     SharedPreferences.setMockInitialValues({
-      'api_base_url_v3': ApiConfig.legacyHostedBaseUrl,
-      'api_base_url_v2': ApiConfig.hostedBaseUrl,
+      'api_base_url_v3': ApiConfig.retiredHostedBaseUrls.first,
+      'api_base_url_v2': ApiConfig.retiredHostedBaseUrls.last,
     });
 
     await ApiConfig.load();
 
     expect(ApiConfig.baseUrl, ApiConfig.resolvedDefaultBaseUrl);
     final preferences = await SharedPreferences.getInstance();
+    expect(preferences.getString('api_base_url_v4'), ApiConfig.resolvedDefaultBaseUrl);
+    expect(preferences.containsKey('api_base_url_v3'), isFalse);
     expect(preferences.containsKey('api_base_url_v2'), isFalse);
+  });
+
+  test('saved custom backend migrates to the current preference key', () async {
+    SharedPreferences.setMockInitialValues({
+      'api_base_url_v3': 'https://attendance.example.test/api',
+    });
+
+    await ApiConfig.load();
+
+    expect(ApiConfig.baseUrl, 'https://attendance.example.test/api');
+    final preferences = await SharedPreferences.getInstance();
+    expect(
+      preferences.getString('api_base_url_v4'),
+      'https://attendance.example.test/api',
+    );
+    expect(preferences.containsKey('api_base_url_v3'), isFalse);
   });
 
   test(

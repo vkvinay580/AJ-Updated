@@ -17,7 +17,12 @@
 Options -Indexes
 DirectoryIndex disabled
 RewriteEngine On
+RewriteCond %{HTTPS} !=on
 RewriteCond %{REQUEST_URI} !^/\.well-known/acme-challenge/
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
+RewriteCond %{REQUEST_URI} !^/\.well-known/acme-challenge/
+RewriteCond %{HTTP_HOST} !^attendance\.aryangold\.in(?::[0-9]+)?$ [NC]
 RewriteRule ^(.*)$ http://127.0.0.1:3000/$1 [P,L]
 
 # php -- BEGIN cPanel-generated handler, do not edit

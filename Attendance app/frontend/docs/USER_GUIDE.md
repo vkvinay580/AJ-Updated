@@ -4,7 +4,7 @@ Open `http://127.0.0.1:8000/` for the Aryan Gold employee web application and `h
 
 Use an existing authorized account from the imported backup or the local accounts supplied in chat. The local database is separate from existing XAMPP databases. Complete frontend source, Android code, and assets for version 5.0.36 (5037) are now restored and locally rebranded for Aryan Gold. The full upstream user guide is retained in `UPSTREAM_USER_GUIDE.md`.
 
-The local employee web build connects to the local API. Use the new localhost origin so saved settings from other deployments do not carry over.
+The production app connects to `https://attendance.aryangold.in/api` by default. Local employee web and Android builds connect to the local API only when the developer builds them with the documented `API_BASE_URL` override. Release Android builds reject cleartext HTTP; debug builds retain HTTP support for local development.
 
 The Aryan Gold staff login page at `https://aryangold.in/login` provides direct Android APK downloads for both the AJ app and the Attendance app. The Attendance APK opens the hosted service at `https://attendance.aryangold.in`.
 
@@ -30,6 +30,8 @@ Branch-portal sign-in now explains the exact corrective action: an employee with
 
 ## Documentation change log
 
+- 2026-10-14: Updated Add Admin so HR administrators select the role and visible menus and enter a strong temporary password twice; the system no longer assigns or stores a shared default password.
+- 2026-10-14: Made the Attendance production API the default for fresh builds, migrated saved retired endpoints, restricted cleartext HTTP to debug Android builds, and updated backend and mobile security dependencies while preserving biometric unlock and saved sessions.
 - 2026-10-14: Added a direct Attendance APK download to the Aryan Gold staff login page; the downloaded build connects to the hosted Attendance API.
 - 2026-10-14: Added private employee document uploads and employee self-service downloads for offer letters, payslips, experience letters, and relieving letters.
 - 2026-10-10: Added smoother administrator page transitions, navigation feedback, modal/dropdown motion, and accessible reduced-motion behavior; administrator workflows are unchanged.
