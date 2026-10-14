@@ -80,6 +80,15 @@ The connected Android app lives in [android](./android/README.md) and targets
 native camera permissions, file uploads, saving, sharing, and printing. See its
 README for APK builds, installation, and the website integration deployment steps.
 
+## Attendance app development
+
+The Attendance Flutter frontend, Laravel API, and migrations are in `Attendance app/`.
+After cloning, follow the [Attendance developer guide](<Attendance app/frontend/docs/DEVELOPER_GUIDE.md>)
+for the local PHP, Composer, MySQL, and Flutter setup, Android emulator API routing,
+and private payroll configuration. Local credentials, employee database exports,
+and payroll records are intentionally excluded from Git; restore authorized
+development data from its secure source when needed.
+
 
 ## How to run
 
