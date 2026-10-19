@@ -21,18 +21,13 @@ The Android package ID is `in.aryangold.aryan_verification`. This initial sidelo
 
 The default build uses WorkManager to check for new assignments with a requested 15-minute interval and Android local notifications. Grant notification permission and allow background activity. Android may defer work due to battery restrictions, force-stop, or unavailable connectivity. Open the app and refresh to fetch assignments immediately.
 
-For instant FCM push, register this Android package in Firebase, enable Firebase Cloud Messaging HTTP v1, configure the backend environment with `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, and rebuild with:
+For instant FCM push, register `in.aryangold.aryan_verification` in Firebase, place the downloaded `google-services.json` at `android/app/google-services.json`, enable Firebase Cloud Messaging HTTP v1, and configure the backend environment with `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY`. The config file is intentionally ignored by Git. A normal release build then reads the public Android Firebase configuration through the Google services Gradle plugin:
 
 ```sh
-flutter build apk --release \
-  --dart-define=API_BASE=https://aryangold.in/api \
-  --dart-define=FIREBASE_PROJECT_ID=your-project \
-  --dart-define=FIREBASE_API_KEY=your-android-api-key \
-  --dart-define=FIREBASE_APP_ID=your-android-app-id \
-  --dart-define=FIREBASE_SENDER_ID=your-messaging-sender-id
+flutter build apk --release --dart-define=API_BASE=https://aryangold.in/api
 ```
 
-These build values are the public Android app configuration. The service-account private key belongs only on the server, never in the app or repository. See the [notification plugin setup](https://pub.dev/packages/flutter_local_notifications) for Android platform requirements.
+For non-Android builds or CI environments without `google-services.json`, the same public values can still be supplied using the `FIREBASE_PROJECT_ID`, `FIREBASE_API_KEY`, `FIREBASE_APP_ID`, and `FIREBASE_SENDER_ID` Dart defines. The service-account private key belongs only on the server, never in the app or repository. See the [notification plugin setup](https://pub.dev/packages/flutter_local_notifications) for Android platform requirements.
 
 ## Workflow and storage
 

@@ -28,6 +28,7 @@ bool get firebaseConfigured =>
     firebaseAppId.isNotEmpty &&
     firebaseSenderId.isNotEmpty &&
     firebaseProjectId.isNotEmpty;
+bool firebaseAvailable = false;
 const verificationPollTask = 'aryan_verification_assignment_poll';
 const verificationPollUniqueName = 'aryan_verification_assignment_periodic';
 final localNotifications = FlutterLocalNotificationsPlugin();
@@ -136,15 +137,20 @@ Future<void> scheduleVerificationPolling() async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (firebaseConfigured) {
+  try {
     await Firebase.initializeApp(
-      options: const FirebaseOptions(
-        apiKey: firebaseApiKey,
-        appId: firebaseAppId,
-        messagingSenderId: firebaseSenderId,
-        projectId: firebaseProjectId,
-      ),
+      options: firebaseConfigured
+          ? const FirebaseOptions(
+              apiKey: firebaseApiKey,
+              appId: firebaseAppId,
+              messagingSenderId: firebaseSenderId,
+              projectId: firebaseProjectId,
+            )
+          : null,
     );
+    firebaseAvailable = true;
+  } catch (_) {
+    // Keep periodic assignment polling available if Firebase is unavailable.
   }
   await Workmanager().initialize(verificationBackgroundDispatcher);
   await initializeLocalNotifications(requestPermission: true);
@@ -198,7 +204,7 @@ class _AryanVerificationAppState extends State<AryanVerificationApp> {
   Future<void> signOut() async {
     if (token != null) {
       try {
-        if (firebaseConfigured) {
+        if (firebaseAvailable) {
           final deviceToken = await FirebaseMessaging.instance.getToken();
           if (deviceToken != null) {
             await Api(
@@ -528,7 +534,7 @@ class _HomePageState extends State<HomePage> {
         unawaited(refresh(silent: true));
       }
     });
-    if (firebaseConfigured) {
+    if (firebaseAvailable) {
       foregroundPush = FirebaseMessaging.onMessage.listen((_) {
         unawaited(pollVerificationAssignments());
         unawaited(refresh(silent: true));
@@ -547,7 +553,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _registerPush() async {
-    if (!firebaseConfigured) return;
+    if (!firebaseAvailable) return;
     try {
       await FirebaseMessaging.instance.requestPermission();
       final token = await FirebaseMessaging.instance.getToken();
