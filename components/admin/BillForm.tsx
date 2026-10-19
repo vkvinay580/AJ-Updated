@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, BellRing, Plus, Search, Send, ShieldCheck, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
@@ -13,6 +13,8 @@ type Item = { metal: "gold" | "silver"; description: string; itemDescription: st
 type BusinessMode = "walkin" | "pledged";
 type PaymentMethod = "cash" | "upi" | "bank_transfer" | "card" | "cheque";
 type Payment = { method: PaymentMethod; amount: string; accountNumber: string; ifscCode: string; upiId: string; chequeNumber: string; cardNumber: string };
+type VerificationOption = { id:number; userId:string; name:string; phone?:string; openCount:number };
+type VerificationHistory = { id:number; status:string; teName:string; teUserId:string; assignedAt:string; completedAt?:string; verificationNotes?:string; failureReason?:string };
 
 const ITEM_OPTIONS = [
   { description: "Gold Ornament", hsnCode: "711319", metal: "gold" },
@@ -56,6 +58,13 @@ export default function BillForm({ portal = "admin", fixedRates, availableFundPa
   const [shareAfterSave, setShareAfterSave] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [verificationOptions,setVerificationOptions]=useState<VerificationOption[]>([]);
+  const [verificationHistory,setVerificationHistory]=useState<VerificationHistory[]>([]);
+  const [verificationTe,setVerificationTe]=useState("");
+  const [bmPhone,setBmPhone]=useState("");
+  const [verificationNotes,setVerificationNotes]=useState("");
+  const [verificationNotice,setVerificationNotice]=useState("");
+  const [sendingVerification,setSendingVerification]=useState(false);
 
   useEffect(() => {
     if (!initial) return;
@@ -102,6 +111,20 @@ export default function BillForm({ portal = "admin", fixedRates, availableFundPa
     }, 250);
     return () => { cancelled = true; clearTimeout(timer); };
   }, [query, customer, apiBase]);
+  useEffect(()=>{
+    if(!isBranch||!customer)return;
+    let cancelled=false;
+    void requestJson<{tes?:VerificationOption[];requests?:VerificationHistory[];error?:string}>(`/api/branch/verifications?customerId=${customer.id}`,{cache:"no-store"}).then(({response,data})=>{
+      if(cancelled)return;if(!response.ok)throw new Error(data.error||"Unable to load verification options.");setVerificationOptions(data.tes||[]);setVerificationHistory(data.requests||[]);setVerificationNotice("");setVerificationTe("");setVerificationNotes("");
+    }).catch(caught=>{if(!cancelled)setVerificationNotice(messageFrom(caught,"Unable to load verification options."));});
+    return()=>{cancelled=true;};
+  },[isBranch,customer]);
+
+  async function sendForVerification(){
+    if(!customer||!verificationTe||bmPhone.replace(/\D/g,"").length!==10){setVerificationNotice("Select a TE and enter the branch manager's 10-digit mobile number.");return;}
+    setSendingVerification(true);setVerificationNotice("");
+    try{const{response,data}=await requestJson<{message?:string;error?:string}>("/api/branch/verifications",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({customerId:customer.id,teUserId:Number(verificationTe),bmPhone,notes:verificationNotes})});setVerificationNotice(data.message||data.error||"Verification request saved.");if(response.ok){setVerificationTe("");setVerificationNotes("");const refreshed=await requestJson<{tes?:VerificationOption[];requests?:VerificationHistory[]}>(`/api/branch/verifications?customerId=${customer.id}`,{cache:"no-store"});if(refreshed.response.ok){setVerificationOptions(refreshed.data.tes||[]);setVerificationHistory(refreshed.data.requests||[]);}}}catch(caught){setVerificationNotice(messageFrom(caught,"Unable to send verification request."));}finally{setSendingVerification(false);}
+  }
 
   const totals = useMemo(() => {
     const subtotalPaise = items.reduce((sum, item) => sum + Math.round(((Number(item.netWeightGrams) || 0) * (Number(item.ratePerGram) || 0) + (Number(item.making) || 0)) * 100), 0);
@@ -197,6 +220,8 @@ export default function BillForm({ portal = "admin", fixedRates, availableFundPa
     <div className="stepper compact" aria-label="Billing progress"><div className="active" aria-current={!customer ? "step" : undefined}><i>1</i><span>Customer</span></div><b/><div className={customer ? "active" : ""} aria-current={customer ? "step" : undefined}><i>2</i><span>Bill details</span></div><b/><div><i>3</i><span>Complete</span></div></div>
     <form onSubmit={save} className="billing-layout"><div className="billing-main">
       <section className="panel form-panel"><div className="form-section-heading"><span>01</span><div><h2>Customer</h2><p>Every bill is tied to a company customer.</p></div></div>{customer ? <div className="selected-customer"><div className="user-avatar">{customer.name[0]}</div><div><strong>{customer.name}</strong><span>+91 {customer.phone}{customer.email ? ` · ${customer.email}` : ""}</span></div><button type="button" onClick={() => { setCustomer(null); setResults([]); setSearching(false); setSearchAttempted(false); setError(""); }}>Change</button></div> : <div className="customer-search"><Search/><input value={query} inputMode="numeric" maxLength={10} aria-label="Search customers by phone number" onChange={event => { const value = event.target.value.replace(/\D/g, "").slice(0, 10); setQuery(value); setSearching(false); setSearchAttempted(false); setError(""); if (value.length < 2) setResults([]); }} placeholder="Search by 10-digit phone number…"/>{results.length > 0 && <div>{results.map(result => <button type="button" key={result.id} onClick={() => { setCustomer(result); setQuery(""); setResults([]); setSearching(false); setSearchAttempted(false); setError(""); }}><strong>{result.name}</strong><span>+91 {result.phone}</span></button>)}</div>}{searching && <span className="customer-search-status" role="status">Searching customers…</span>}{!searching && searchAttempted && results.length === 0 && <span className="customer-search-status" role="status">No customer found for this phone number.</span>}<p>Not registered? <Link href={`${pageBase}/customers/new`}>Add a new customer</Link></p></div>}</section>
+
+      {isBranch&&customer&&<section className="panel form-panel verification-request-panel"><div className="form-section-heading"><span><ShieldCheck/></span><div><h2>Customer field verification</h2><p>Assign an active TE now; billing can continue while the home visit is pending.</p></div></div><div className="verification-request-grid"><label>Assign TE<select value={verificationTe} onChange={event=>setVerificationTe(event.target.value)}><option value="">Select TE</option>{verificationOptions.map(te=><option key={te.id} value={te.id}>{te.name} · {te.userId} · {te.openCount||0} open</option>)}</select></label><label>Branch manager mobile<input value={bmPhone} onChange={event=>setBmPhone(event.target.value.replace(/\D/g,"").slice(0,10))} inputMode="numeric" maxLength={10} placeholder="10-digit mobile number"/></label><label className="full">Instructions for TE<textarea value={verificationNotes} onChange={event=>setVerificationNotes(event.target.value)} maxLength={1000} rows={2} placeholder="Landmark, visit timing, or special verification instructions"/></label><button type="button" className="admin-secondary" onClick={()=>void sendForVerification()} disabled={sendingVerification||!verificationOptions.length}><Send/> {sendingVerification?"Sending…":"Send for verification"}</button><a className="verification-app-link" href="/downloads/aryan-verification.apk" download="Aryan-Verification.apk"><BellRing/> Aryan Verification app</a></div>{verificationNotice&&<p className="verification-inline-notice" role="status">{verificationNotice}</p>}{verificationHistory.length>0&&<div className="verification-history-inline">{verificationHistory.map(item=><div key={item.id}><span className={`verification-status ${item.status}`}>{item.status.replaceAll("_"," ")}</span><strong>{item.teName}</strong><small>{new Date(item.assignedAt).toLocaleString("en-IN")}{item.verificationNotes?` · ${item.verificationNotes}`:item.failureReason?` · ${item.failureReason}`:""}</small></div>)}</div>}</section>}
 
       {isBranch && !pledgeId && <section className="panel form-panel"><div className="form-section-heading"><span>02</span><div><h2>Purchase type</h2><p>Select how this purchase should move through the branch workflow.</p></div></div><div className="transaction-toggle"><button type="button" className={businessMode === "walkin" ? "active" : ""} onClick={() => setBusinessMode("walkin")}><strong>Walk-in purchase</strong><span>Complete purchase details and submit for admin approval</span></button><button type="button" className={businessMode === "pledged" ? "active" : ""} onClick={() => setBusinessMode("pledged")}><strong>Pledged purchase</strong><span>Add pledge details now and complete purchase billing only after release</span></button></div>{businessMode === "pledged" && <div className="form-grid pledge-fields"><label>Pledge amount (₹)<input name="pledgeAmount" value={pledgeAmount} onChange={event=>setPledgeAmount(event.target.value)} required type="number" min="1" step="0.01"/></label><label>Release place<input name="releasePlace" value={releasePlace} onChange={event=>setReleasePlace(event.target.value)} required maxLength={190} placeholder="Bank / finance company / lender"/></label><label>Release amount (₹)<input name="releaseAmount" value={releaseAmount} onChange={event=>setReleaseAmount(event.target.value)} required type="number" min="0.01" step="0.01"/></label><div className="full"><CameraField label="Pledge bill document" name="pledgeDocument" acceptPdf multiple/></div></div>}</section>}
 

@@ -62,6 +62,14 @@ const portals = [
 
 const androidApps = [
   {
+    href: "/downloads/aryan-verification.apk",
+    title: "Aryan Verification",
+    description: "For TE users: receive customer visits, capture photos and references, and submit verification results. Sign in with your admin-issued TE user ID and password.",
+    action: "Download TE app",
+    icon: ShieldCheck,
+    download: "Aryan-Verification.apk",
+  },
+  {
     href: "/downloads/aryan-gold.apk",
     title: "AJ App",
     description: "Install the Aryan Gold business app on your Android phone.",

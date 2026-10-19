@@ -239,12 +239,14 @@ try {
   await connection.execute("DELETE FROM sessions WHERE expires_at < UTC_TIMESTAMP()");
   await connection.execute("DELETE FROM head_office_sessions WHERE expires_at < UTC_TIMESTAMP()");
   await connection.execute("DELETE FROM accounts_sessions WHERE expires_at < UTC_TIMESTAMP()");
+  await connection.execute("DELETE FROM te_sessions WHERE expires_at < UTC_TIMESTAMP()");
   mkdirSync(path.join(process.cwd(), "storage", "kyc"), { recursive: true });
   mkdirSync(path.join(process.cwd(), "storage", "ornaments"), { recursive: true });
   mkdirSync(path.join(process.cwd(), "storage", "signatures"), { recursive: true });
   mkdirSync(path.join(process.cwd(), "storage", "pledges"), { recursive: true });
   mkdirSync(path.join(process.cwd(), "storage", "chat"), { recursive: true });
-  console.log("Database tables, companies, administrator, branch operations, Head Office users, and Accounts user are ready.");
+  mkdirSync(path.join(process.cwd(), "storage", "verification"), { recursive: true });
+  console.log("Database tables, companies, administrator, branch operations, verification workflow, Head Office users, and Accounts user are ready.");
 } finally {
   await connection.end();
 }

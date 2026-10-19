@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   const auth = await authorized(request);
   if (auth.error || !auth.session) return auth.error;
   const branchId = auth.session.branchId;
-  const [settings, customers, transactions, pledgeDocuments, funds, expenses, closings, fundLedger, stockLedger, goldTransfers, eligibleTransferItems, availableFunds, availableStock] = await Promise.all([
+  const [settings, customers, transactions, pledgeDocuments, funds, expenses, closings, fundLedger, stockLedger, goldTransfers, eligibleTransferItems, verificationNotifications, availableFunds, availableStock] = await Promise.all([
     one<RowDataPacket>("SELECT sale_rate_paise_per_gram AS saleRate, purchase_rate_paise_per_gram AS purchaseRate, updated_at AS updatedAt FROM business_settings WHERE id=1"),
     rows<RowDataPacket>("SELECT id,name,phone,address,created_at AS createdAt FROM branch_customers WHERE branch_id=? ORDER BY id DESC LIMIT 100", [branchId]),
     rows<RowDataPacket>(`SELECT t.id,t.bill_id AS billId,t.transaction_type AS type,t.business_mode AS businessMode,t.gold_weight_mg AS weightMg,
@@ -59,10 +59,14 @@ export async function GET(request: NextRequest) {
       JOIN bill_items bi ON bi.bill_id=b.id LEFT JOIN branch_gold_transfer_items ti ON ti.bill_item_id=bi.id
       WHERE t.branch_id=? AND t.transaction_type='purchase' AND t.status='billed' AND bi.metal='gold' AND ti.id IS NULL
       ORDER BY b.bill_date,b.id,bi.id`, [branchId]),
+    rows<RowDataPacket>(`SELECT n.id,n.title,n.body,n.verification_request_id AS requestId,n.read_at AS readAt,n.created_at AS createdAt,
+      r.status,c.name AS customerName,u.name AS teName FROM branch_notifications n
+      LEFT JOIN customer_verification_requests r ON r.id=n.verification_request_id LEFT JOIN customers c ON c.id=r.customer_id
+      LEFT JOIN te_users u ON u.id=r.te_user_id WHERE n.branch_id=? AND n.employee_id=? ORDER BY n.id DESC LIMIT 25`, [branchId, auth.session.employeeId]),
     fundBalance(branchId), stockBalance(branchId),
   ]);
   return NextResponse.json({ session: auth.session, settings, customers, transactions, pledgeDocuments, funds, expenses, closings,
-    balances: { fundPaise: availableFunds, stockMg: availableStock }, fundLedger, stockLedger, goldTransfers, eligibleTransferItems });
+    balances: { fundPaise: availableFunds, stockMg: availableStock }, fundLedger, stockLedger, goldTransfers, eligibleTransferItems, verificationNotifications });
 }
 
 export async function POST(request: NextRequest) {

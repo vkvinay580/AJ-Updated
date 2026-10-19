@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, CircleDollarSign, ClipboardCheck, Coins, FileText, KeyRound, Landmark, LogOut, Menu, Plus, ReceiptText, Send, Users, X } from "lucide-react";
+import { BellRing, Building2, Check, CircleDollarSign, ClipboardCheck, Coins, FileText, KeyRound, Landmark, LogOut, Menu, Plus, ReceiptText, Send, ShieldCheck, Users, X } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -12,8 +12,8 @@ import ChatDock from "@/components/chat/ChatDock";
 
 type RecordRow = Record<string, string | number | boolean | null>;
 type Data = { settings: RecordRow | null; balances: { fundPaise:number; stockMg:number }; customers: RecordRow[]; transactions: RecordRow[];
-  pledgeDocuments: RecordRow[]; funds: RecordRow[]; expenses: RecordRow[]; closings: RecordRow[]; fundLedger: RecordRow[]; stockLedger: RecordRow[]; goldTransfers: RecordRow[]; eligibleTransferItems: RecordRow[] };
-const empty: Data = { settings:null, balances:{ fundPaise:0, stockMg:0 }, customers:[], transactions:[], pledgeDocuments:[], funds:[], expenses:[], closings:[], fundLedger:[], stockLedger:[], goldTransfers:[], eligibleTransferItems:[] };
+  pledgeDocuments: RecordRow[]; funds: RecordRow[]; expenses: RecordRow[]; closings: RecordRow[]; fundLedger: RecordRow[]; stockLedger: RecordRow[]; goldTransfers: RecordRow[]; eligibleTransferItems: RecordRow[]; verificationNotifications:RecordRow[] };
+const empty: Data = { settings:null, balances:{ fundPaise:0, stockMg:0 }, customers:[], transactions:[], pledgeDocuments:[], funds:[], expenses:[], closings:[], fundLedger:[], stockLedger:[], goldTransfers:[], eligibleTransferItems:[], verificationNotifications:[] };
 const money = (paise: unknown) => new Intl.NumberFormat("en-IN", { style:"currency", currency:"INR", maximumFractionDigits:2 }).format(Number(paise || 0) / 100);
 const grams = (mg: unknown) => `${(Number(mg || 0) / 1000).toLocaleString("en-IN", { maximumFractionDigits:3 })} g`;
 const today = () => new Date().toLocaleDateString("en-CA", { timeZone:"Asia/Kolkata" });
@@ -36,6 +36,7 @@ export default function BranchWorkspace({ initialSession }: { initialSession: Br
     try { const { response, data: result } = await requestJson<{ message?: string; error?: string }>("/api/branch/operations", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ action:"gold-transfer", packetIds:fields.getAll("packetIds"), tareWeightGrams:fields.get("tareWeightGrams"), bmName:fields.get("bmName"), bmPhone:fields.get("bmPhone"), notes:fields.get("notes") }) }); setNotice(result.message || result.error || "Saved."); if(response.ok){form.reset();setSelectedTransferPackets([]);setTareWeightGrams(0);await load();} }
     catch(caught){setNotice(messageFrom(caught,"Unable to create this Head Office dispatch."));} finally{setWorking(false);} }
   async function logout() { await fetch("/api/branch/logout",{ method:"POST" }); router.replace("/branch/login"); router.refresh(); }
+  async function readVerificationNotification(id:number){try{await requestJson("/api/branch/verifications",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({notificationId:id})});await load();}catch(caught){setNotice(messageFrom(caught,"Unable to update notification."));}}
   const nav = [["overview","Overview",Building2],["customers","Add customer",Users],["billing","Create purchase bill",ReceiptText],["pledges","Pledge releases",FileText],
     ["transfers","Gold to HO",Send],["funds","Request funds",CircleDollarSign],["expenses","Expenses",ReceiptText],["ledger","Ledgers",Landmark],["closing","Daily closing",ClipboardCheck],["password","Change password",KeyRound]] as const;
   const awaitingPledges=data.transactions.filter(row => row.businessMode === "pledged" && row.status === "awaiting_pledge");
@@ -46,7 +47,7 @@ export default function BranchWorkspace({ initialSession }: { initialSession: Br
     <nav>{nav.map(([key,label,Icon])=><button key={key} className={tab===key ? "active":""} onClick={()=>{if(key==="customers")router.push("/branch/customers/new");else if(key==="billing")router.push("/branch/bills/new");else setTab(key);setOpen(false);}}><Icon/>{label}</button>)}</nav>
     <div className="branch-identity"><div><strong>{initialSession.employeeName}</strong><span>{initialSession.employeeId} · {initialSession.branchId}</span></div><button onClick={logout} aria-label="Sign out"><LogOut/></button></div></aside>
     {open && <button className="branch-scrim" onClick={()=>setOpen(false)} aria-label="Close navigation"/>}<main className="branch-main"><header><button onClick={()=>setOpen(true)} aria-label="Open navigation"><Menu/></button><div><span>LIVE RATE</span><strong>Buy {money(data.settings?.purchaseRate)}/g</strong><i/><strong>Sell {money(data.settings?.saleRate)}/g</strong></div><small>{initialSession.branchId}</small></header>
-    <div className="branch-content">{notice && <div className="ops-notice" role="status">{notice}<button onClick={()=>setNotice("")} aria-label="Dismiss message">×</button></div>}{loading ? <div className="branch-loading">Loading branch workspace…</div> : <>
+    <div className="branch-content">{notice && <div className="ops-notice" role="status">{notice}<button onClick={()=>setNotice("")} aria-label="Dismiss message">×</button></div>}{!loading&&data.verificationNotifications.some(item=>!item.readAt)&&<section className="branch-verification-notifications" aria-label="Verification results"><header><BellRing/><div><strong>Customer verification updates</strong><span>Results requested by you</span></div></header>{data.verificationNotifications.filter(item=>!item.readAt).map(item=><article key={Number(item.id)}><ShieldCheck/><div><strong>{item.title}</strong><p>{item.body}</p><small>{new Date(String(item.createdAt)).toLocaleString("en-IN")}</small></div><button onClick={()=>void readVerificationNotification(Number(item.id))}><Check/> Mark read</button></article>)}</section>}{loading ? <div className="branch-loading">Loading branch workspace…</div> : <>
       {tab==="overview" && <section className="branch-section"><Title eyebrow="BRANCH WORKSPACE" title={`Good day, ${initialSession.employeeName.split(" ")[0]}`} text="Track branch funds, gold stock, pledges, and today’s approvals."/><div className="branch-metrics">
         <article><CircleDollarSign/><span><small>Funds available</small><strong>{money(data.balances.fundPaise)}</strong></span></article><article><Coins/><span><small>Gold stock available</small><strong>{grams(data.balances.stockMg)}</strong></span></article>
         <article><FileText/><span><small>Awaiting pledge release</small><strong>{awaitingPledges.length}</strong></span></article><article><Send/><span><small>Awaiting action</small><strong>{pending}</strong></span></article></div>

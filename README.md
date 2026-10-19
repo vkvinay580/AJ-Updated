@@ -10,6 +10,7 @@ A responsive gold-trading website and private, multi-company administration syst
 - Aadhaar and/or PAN KYC with encrypted identification numbers and protected uploads.
 - Optional customer working proof with company name, address, designation, a camera-captured or uploaded company ID card, and an old-gold wearing image.
 - Upload or live webcam capture for KYC documents and an optional customer photograph.
+- Branch billing can assign a customer home-verification visit to an admin-created TE. The Aryan Verification Android app records photos, references, an authentication person and mobile number, and a verified/could-not-verify outcome. Results appear under customer KYC and notify the requesting BM.
 - Gold sale and purchase bills with multiple items, purity, weight, rate, tax, adjustment, and payment method.
 - Company-isolated customer, KYC, and bill search.
 - Print-ready invoices with browser PDF download support.
@@ -50,7 +51,7 @@ BRANCH_PORTAL_URL=https://biz.aryangold.in
 
 `NEXT_PUBLIC_SITE_URL` drives canonical metadata, the sitemap, robots file, and primary-site origin validation. `BRANCH_PORTAL_URL` is also included in the same-origin allowlist so browser POST requests from the mapped branch subdomain pass CSRF protection behind cPanel's reverse proxy. Both values must be HTTPS origins without paths or credentials. Create DNS and TLS for the attendance and branch subdomains before publishing the Android apps. The Attendance production database and Laravel settings are documented in `Attendance app/Backend/.env.production.example`; keep real credentials only in the hosting environment.
 
-Back up the database, `storage/kyc`, `storage/pledges`, and `storage/chat` together. Customer KYC files, company ID cards, and old-gold wearing images are stored under `storage/kyc`; private documents and chat attachments are never placed in the public directory.
+Back up the database, `storage/kyc`, `storage/pledges`, `storage/chat`, and `storage/verification` together. Customer KYC files, company ID cards, and old-gold wearing images are stored under `storage/kyc`; private documents, verification photos, and chat attachments are never placed in the public directory.
 
 ## Team chat
 
@@ -67,6 +68,8 @@ The MySQL/MariaDB schema is stored in [database/schema.sql](./database/schema.sq
 - `chat_users` and `chat_messages` (cross-role directory, private conversations, unread/read state, and protected attachment metadata)
 - `customers` (phone unique inside each company, optional employment details, private company ID card metadata, and old-gold wearing-image metadata)
 - `kyc_records` (encrypted number, search hash, masked last four, private file path)
+- `te_users`, `te_sessions`, `te_device_tokens` (TE credentials, expiring app sessions, notification registrations)
+- `customer_verification_requests`, `customer_verification_photos`, `customer_verification_references`, `branch_notifications` (visit assignment, evidence, result, and requesting BM alerts)
 - `bills`, `bill_items`, and `invoice_sequences` (concurrency-safe company-specific bill numbers)
 - `audit_logs`
 
@@ -76,6 +79,8 @@ The MySQL/MariaDB schema is stored in [database/schema.sql](./database/schema.sq
 npm run lint
 npm run build
 ```
+
+`node scripts/test-verification.mjs` exercises TE access, assignment races, both outcomes, protected photos, KYC, BM notifications and revocation against an isolated temporary MariaDB instance and the production build. It requires local `mariadb-install-db`/`mariadbd` executables and free localhost ports 33417 and 3137; it never connects to the production database.
 
 The database initializer is idempotent and upgrades an existing AJ schema in place. Run it against a backed-up database before restarting production. Apply Laravel migrations separately from `Attendance app/Backend` with `php artisan migrate --force`. An empty Attendance database uses the committed schema-only bootstrap; employee, branch, credential, and administrator records must be provisioned separately by an authorized operator.
 
@@ -87,6 +92,14 @@ The connected Android app lives in [android](./android/README.md) and targets
 `https://aryangold.in`. It shares the existing screens, backend, and data, with
 native camera permissions, file uploads, saving, sharing, and printing. See its
 README for APK builds, installation, and the website integration deployment steps.
+
+## Aryan Verification app
+
+Source and build instructions are in [verification_app](verification_app/README.md). The Android APK is packaged at `public/downloads/aryan-verification.apk` and linked from `/login`, branch billing, and Admin → Verification & TEs. After deployment, download it at `https://aryangold.in/downloads/aryan-verification.apk`.
+
+Create a TE in Admin → Verification & TEs, then select or register a customer in branch billing and send a verification request. A verified result requires at least two visit photos, one reference, and an authentication person's name/mobile. Could-not-verify requires a reason. Billing remains available while a visit is pending.
+
+The app checks for assignments in Android background work at a requested 15-minute interval; Android may defer delivery. Instant push requires server Firebase credentials and matching Firebase Android build configuration, as documented in the app README. No Firebase secrets are included in the APK.
 
 ## Attendance app development
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { RowDataPacket } from "mysql2";
 import { apiError, authenticated, cleanPhone, cleanText, requestIp } from "@/lib/api";
 import { removeCustomerFile, storeCustomerFile } from "@/lib/customer-files";
+import { removeVerificationPhoto } from "@/lib/verification-files";
 import { execute, one, rows, transaction } from "@/lib/db";
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -21,8 +22,24 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     FROM kyc_records WHERE customer_id = ? AND company_id = ? ORDER BY document_type`, [id, session.companyId]);
   const bills = await rows<RowDataPacket>(`SELECT id, bill_number AS billNumber, transaction_type AS transactionType,
     DATE_FORMAT(bill_date, '%Y-%m-%d') AS billDate, total_paise AS totalPaise FROM bills WHERE customer_id = ? AND company_id = ? ORDER BY id DESC LIMIT 25`, [id, session.companyId]);
+  const verifications = await rows<RowDataPacket>(`SELECT r.id,r.status,r.branch_id AS branchId,r.branch_name AS branchName,r.bm_name AS bmName,r.bm_phone AS bmPhone,
+    r.request_notes AS requestNotes,r.authentication_person_name AS authenticationPersonName,
+    r.authentication_person_relationship AS authenticationPersonRelationship,r.authentication_person_phone AS authenticationPersonPhone,
+    r.verification_notes AS verificationNotes,r.failure_reason AS failureReason,r.latitude,r.longitude,
+    r.assigned_at AS assignedAt,r.started_at AS startedAt,r.completed_at AS completedAt,u.name AS teName,u.user_id AS teUserId
+    FROM customer_verification_requests r JOIN te_users u ON u.id=r.te_user_id
+    WHERE r.customer_id=? AND r.company_id=? ORDER BY r.id DESC`, [id, session.companyId]);
+  const verificationIds = verifications.map((verification) => Number(verification.id));
+  let verificationPhotos: RowDataPacket[] = [], verificationReferences: RowDataPacket[] = [];
+  if (verificationIds.length) {
+    const placeholders = verificationIds.map(() => "?").join(",");
+    verificationPhotos = await rows<RowDataPacket>(`SELECT id,request_id AS requestId,original_name AS originalName,mime_type AS mimeType,created_at AS createdAt
+      FROM customer_verification_photos WHERE request_id IN (${placeholders}) ORDER BY id`, verificationIds);
+    verificationReferences = await rows<RowDataPacket>(`SELECT id,request_id AS requestId,name,relationship,phone,notes
+      FROM customer_verification_references WHERE request_id IN (${placeholders}) ORDER BY id`, verificationIds);
+  }
   const signatureBill=await one<RowDataPacket>("SELECT id FROM bills WHERE customer_id = ? AND company_id = ? AND signature_image_path IS NOT NULL ORDER BY id DESC LIMIT 1",[id,session.companyId]);
-  return NextResponse.json({ customer, kyc, bills, signatureBillId:signatureBill?.id||null });
+  return NextResponse.json({ customer, kyc, bills, verifications, verificationPhotos, verificationReferences, signatureBillId:signatureBill?.id||null });
 }
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -100,11 +117,14 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
   if (!customer) return apiError("Customer not found.", 404);
   if (Number(customer.billCount) > 0) return apiError(`This customer has ${customer.billCount} bill${Number(customer.billCount) === 1 ? "" : "s"}. Delete those bills before deleting the customer.`, 409);
   const documents = await rows<RowDataPacket & { documentPath: string | null }>("SELECT document_path AS documentPath FROM kyc_records WHERE customer_id = ? AND company_id = ?", [id, session.companyId]);
+  const verificationPhotos = await rows<RowDataPacket & { filePath: string }>(`SELECT p.file_path AS filePath FROM customer_verification_photos p
+    JOIN customer_verification_requests r ON r.id=p.request_id WHERE r.customer_id=? AND r.company_id=?`, [id, session.companyId]);
   await transaction(async (connection) => {
     await execute("DELETE FROM customers WHERE id = ? AND company_id = ?", [id, session.companyId], connection);
     await execute("INSERT INTO audit_logs (admin_id, company_id, action, entity_type, entity_id, ip_address) VALUES (?, ?, 'customer_deleted', 'customer', ?, ?)", [session.adminId, session.companyId, id, requestIp(request)], connection);
   });
   const storedPaths = [customer.customerImagePath, customer.companyIdCardPath, customer.oldGoldWearingImagePath, ...documents.map((document) => document.documentPath)];
   for (const storedPath of storedPaths) removeCustomerFile(storedPath);
+  for (const photo of verificationPhotos) removeVerificationPhoto(photo.filePath);
   return NextResponse.json({ ok: true, customerName: customer.name });
 }

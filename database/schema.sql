@@ -94,6 +94,111 @@ CREATE TABLE IF NOT EXISTS kyc_records (
   CONSTRAINT fk_kyc_admin FOREIGN KEY (created_by) REFERENCES admins(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS te_users (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id VARCHAR(100) NOT NULL,
+  name VARCHAR(190) NOT NULL,
+  phone VARCHAR(20) NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_by INT UNSIGNED NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id), UNIQUE KEY uq_te_users_user_id (user_id),
+  CONSTRAINT fk_te_user_admin FOREIGN KEY (created_by) REFERENCES admins(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS te_sessions (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  token_hash CHAR(64) NOT NULL,
+  te_user_id INT UNSIGNED NOT NULL,
+  expires_at DATETIME NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id), UNIQUE KEY uq_te_sessions_token (token_hash),
+  KEY idx_te_sessions_expiry (expires_at),
+  CONSTRAINT fk_te_session_user FOREIGN KEY (te_user_id) REFERENCES te_users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS te_device_tokens (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  te_user_id INT UNSIGNED NOT NULL,
+  device_token VARCHAR(512) NOT NULL,
+  platform VARCHAR(30) NOT NULL DEFAULT 'android',
+  last_seen_at DATETIME NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id), UNIQUE KEY uq_te_device_token (device_token(190)),
+  KEY idx_te_device_user (te_user_id, last_seen_at),
+  CONSTRAINT fk_te_device_user FOREIGN KEY (te_user_id) REFERENCES te_users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS customer_verification_requests (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  company_id INT UNSIGNED NOT NULL,
+  customer_id BIGINT UNSIGNED NOT NULL,
+  te_user_id INT UNSIGNED NOT NULL,
+  branch_id VARCHAR(100) NOT NULL,
+  branch_name VARCHAR(190) NOT NULL,
+  bm_employee_id VARCHAR(100) NOT NULL,
+  bm_name VARCHAR(190) NOT NULL,
+  bm_phone VARCHAR(20) NOT NULL,
+  request_notes VARCHAR(1000) NULL,
+  status ENUM('assigned','in_progress','verified','could_not_verify') NOT NULL DEFAULT 'assigned',
+  authentication_person_name VARCHAR(190) NULL,
+  authentication_person_relationship VARCHAR(120) NULL,
+  authentication_person_phone VARCHAR(20) NULL,
+  verification_notes VARCHAR(2000) NULL,
+  failure_reason VARCHAR(1000) NULL,
+  latitude DECIMAL(10,7) NULL,
+  longitude DECIMAL(10,7) NULL,
+  assigned_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  started_at DATETIME NULL,
+  completed_at DATETIME NULL,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_verification_te_status (te_user_id, status, assigned_at),
+  KEY idx_verification_customer (company_id, customer_id, assigned_at),
+  KEY idx_verification_branch (branch_id, bm_employee_id, assigned_at),
+  CONSTRAINT fk_verification_company FOREIGN KEY (company_id) REFERENCES companies(id),
+  CONSTRAINT fk_verification_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
+  CONSTRAINT fk_verification_te FOREIGN KEY (te_user_id) REFERENCES te_users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS customer_verification_photos (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  request_id BIGINT UNSIGNED NOT NULL,
+  file_path VARCHAR(500) NOT NULL,
+  original_name VARCHAR(255) NOT NULL,
+  mime_type VARCHAR(100) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id), KEY idx_verification_photos_request (request_id, id),
+  CONSTRAINT fk_verification_photo_request FOREIGN KEY (request_id) REFERENCES customer_verification_requests(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS customer_verification_references (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  request_id BIGINT UNSIGNED NOT NULL,
+  name VARCHAR(190) NOT NULL,
+  relationship VARCHAR(120) NULL,
+  phone VARCHAR(20) NOT NULL,
+  notes VARCHAR(500) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id), KEY idx_verification_references_request (request_id, id),
+  CONSTRAINT fk_verification_reference_request FOREIGN KEY (request_id) REFERENCES customer_verification_requests(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS branch_notifications (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  branch_id VARCHAR(100) NOT NULL,
+  employee_id VARCHAR(100) NOT NULL,
+  verification_request_id BIGINT UNSIGNED NULL,
+  title VARCHAR(190) NOT NULL,
+  body VARCHAR(1000) NOT NULL,
+  read_at DATETIME NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id), KEY idx_branch_notifications_user (branch_id, employee_id, read_at, created_at),
+  CONSTRAINT fk_branch_notification_verification FOREIGN KEY (verification_request_id) REFERENCES customer_verification_requests(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS bills (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   company_id INT UNSIGNED NOT NULL,

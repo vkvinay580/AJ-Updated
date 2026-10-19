@@ -2,10 +2,12 @@ import { ArrowRight, Flame, Layers3, Scale, Sparkles } from "lucide-react";
 import Link from "next/link";
 import type { RowDataPacket } from "mysql2";
 import { rows } from "@/lib/db";
+import { requireSession } from "@/lib/auth";
 
 const grams = (mg: unknown) => `${(Number(mg || 0) / 1000).toLocaleString("en-IN", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} g`;
 
 export default async function MeltingReportPage() {
+  await requireSession();
   const groups = await rows<RowDataPacket>(`SELECT mg.id,mg.gatti_id AS gattiId,DATE_FORMAT(mg.melt_date,'%Y-%m-%d') AS meltDate,mg.status,
     mg.audited_total_weight_mg AS auditedTotalWeightMg,mg.input_weight_mg AS inputWeightMg,
     mg.output_gatti_weight_mg AS outputWeightMg,mg.matti_weight_mg AS mattiWeightMg,mg.purity,mg.completed_at AS completedAt,

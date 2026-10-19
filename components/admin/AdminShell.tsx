@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, Building2, ChartNoAxesCombined, Download, FileSpreadsheet, FileText, Flame, HandCoins, KeyRound, LayoutDashboard, LogOut, Menu, ReceiptText, ShoppingBag, Upload, UserPlus, Users, X } from "lucide-react";
+import { BookOpen, Building2, ChartNoAxesCombined, Download, FileSpreadsheet, FileText, Flame, HandCoins, KeyRound, LayoutDashboard, LogOut, Menu, ReceiptText, ShieldCheck, ShoppingBag, Upload, UserPlus, Users, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -13,6 +13,7 @@ const links = [
   { href: "/admin/operations", label: "Branch operations", icon: Building2 },
   { href: "/admin/customers/new", label: "Add customer", icon: UserPlus },
   { href: "/admin/customers", label: "Customers & KYC", icon: Users },
+  { href: "/admin/verification", label: "Verification & TEs", icon: ShieldCheck },
   { href: "/admin/bills/new", label: "Create bill", icon: ReceiptText },
   { href: "/admin/bills", label: "Bill register", icon: FileText },
   { href: "/admin/bill-import", label: "Import bills", icon: Upload },
