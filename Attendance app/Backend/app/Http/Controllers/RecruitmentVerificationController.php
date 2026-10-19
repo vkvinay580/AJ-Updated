@@ -43,32 +43,6 @@ class RecruitmentVerificationController extends Controller
         'What makes you different from other candidates applying for this role?',
         'If selected, how soon can you join and what support would you need to start?'
     ];
-    private const HIRING_LOCATION_OPTIONS = [
-        'Karnataka' => [
-            'Bengaluru', 'Mysuru', 'Mangaluru', 'Hubballi', 'Dharwad', 'Belagavi',
-            'Ballari', 'Davanagere', 'Shivamogga', 'Tumakuru', 'Udupi', 'Vijayapura',
-            'Kalaburagi', 'Hassan', 'Raichur', 'Bidar', 'Kolar', 'Chitradurga',
-        ],
-        'Tamil Nadu' => [
-            'Chennai', 'Coimbatore', 'Madurai', 'Salem', 'Tiruchirappalli', 'Tiruppur',
-            'Erode', 'Vellore', 'Tirunelveli', 'Thoothukudi', 'Hosur', 'Dindigul',
-            'Thanjavur', 'Karur', 'Namakkal', 'Cuddalore', 'Kanchipuram', 'Nagercoil',
-        ],
-        'Telangana' => [
-            'Hyderabad', 'Secunderabad', 'Warangal', 'Karimnagar', 'Nizamabad', 'Khammam',
-            'Nalgonda', 'Mahbubnagar', 'Adilabad', 'Siddipet', 'Suryapet', 'Jagtial',
-            'Kamareddy', 'Medchal', 'Sangareddy', 'Ramagundam',
-        ],
-        'Andhra Pradesh' => [
-            'Vijayawada', 'Visakhapatnam', 'Guntur', 'Tirupati', 'Kurnool', 'Nellore',
-            'Rajahmundry', 'Kakinada', 'Kadapa', 'Anantapur', 'Ongole', 'Eluru',
-            'Srikakulam', 'Vizianagaram', 'Chittoor', 'Machilipatnam', 'Bhimavaram',
-        ],
-        'Pondicherry' => [
-            'Puducherry', 'Karaikal', 'Mahe', 'Yanam',
-        ],
-    ];
-
     public function __construct(
         private readonly RecruitmentImageService $imageService,
         private readonly RecruitmentResumeAutofillService $resumeAutofillService
@@ -83,7 +57,6 @@ class RecruitmentVerificationController extends Controller
         return view('recruitment.hiring_form', [
             'formLink' => $formLink,
             'branches' => $this->activeBranches(),
-            'hiringLocationOptions' => self::HIRING_LOCATION_OPTIONS,
             'requiresVideoInterview' => $formLink->requiresVideoInterview(),
             'noticePeriodOptions' => self::NOTICE_PERIOD_OPTIONS,
             'genderOptions' => self::GENDER_OPTIONS,
@@ -110,7 +83,6 @@ class RecruitmentVerificationController extends Controller
         return view('recruitment.hiring_form', [
             'formLink' => $formLink,
             'branches' => $this->activeBranches(),
-            'hiringLocationOptions' => self::HIRING_LOCATION_OPTIONS,
             'requiresVideoInterview' => $formLink->requiresVideoInterview(),
             'noticePeriodOptions' => self::NOTICE_PERIOD_OPTIONS,
             'genderOptions' => self::GENDER_OPTIONS,
@@ -231,10 +203,7 @@ class RecruitmentVerificationController extends Controller
             404
         );
 
-        $branches = Branch::query()
-            ->where('status', 1)
-            ->orderBy('branchName')
-            ->get(['branchId', 'branchName']);
+        $branches = $this->activeBranches();
 
         return view('recruitment.onboarding', [
             'candidate' => $candidate,
@@ -270,10 +239,7 @@ class RecruitmentVerificationController extends Controller
             404
         );
 
-        $branches = Branch::query()
-            ->where('status', 1)
-            ->orderBy('branchName')
-            ->get(['branchId', 'branchName']);
+        $branches = $this->activeBranches();
 
         return view('recruitment.onboarding', [
             'candidate' => $candidate,
@@ -418,8 +384,7 @@ class RecruitmentVerificationController extends Controller
             'present_remuneration' => ['nullable', 'numeric', 'min:0'],
             'salary_expectation' => ['nullable', 'numeric', 'min:0'],
             'notice_period' => ['nullable', Rule::in(self::NOTICE_PERIOD_OPTIONS)],
-            'preferred_work_location_state' => ['required', 'string', 'max:255'],
-            'preferred_work_location_city' => ['required', 'string', 'max:255'],
+            'preferred_work_location_branch_id' => ['required', 'string', 'max:100', Rule::exists('wp_branches_database', 'branchId')->where('status', 1)],
             'place' => ['nullable', 'string', 'max:255'],
             'form_date' => ['nullable', 'date'],
             'signature' => ['required', 'string', 'max:255'],
@@ -489,6 +454,7 @@ class RecruitmentVerificationController extends Controller
     private function validateOnboarding(Request $request): array
     {
         return $request->validate([
+            'preferred_work_location_branch_id' => ['required', 'string', 'max:100', Rule::exists('wp_branches_database', 'branchId')->where('status', 1)],
             'full_name_as_per_aadhar' => ['required', 'string', 'max:255'],
             'father_name' => ['nullable', 'string', 'max:255'],
             'mother_name' => ['nullable', 'string', 'max:255'],
@@ -558,10 +524,7 @@ class RecruitmentVerificationController extends Controller
             $resolvedPosition = trim((string) ($data['custom_position_applied_for'] ?? ''));
         }
 
-        $preferredWorkLocation = $this->resolveHiringLocationOption(
-            $data['preferred_work_location_state'] ?? null,
-            $data['preferred_work_location_city'] ?? null
-        );
+        $preferredWorkLocation = $this->preferredBranchPayload($data['preferred_work_location_branch_id']);
 
         return [
             'hiring_date' => optional($formLink->hiring_date)->toDateString(),
@@ -608,12 +571,7 @@ class RecruitmentVerificationController extends Controller
                 'designation',
                 'relationship',
             ]),
-            'preferred_work_location_state' => $preferredWorkLocation['state'],
-            'preferred_work_location_city' => $preferredWorkLocation['city'],
-            'preferred_work_location_branch_id' => '',
-            'preferred_work_location_branch_name' => $preferredWorkLocation['city'],
-            'preferred_work_location_branch_state' => $preferredWorkLocation['state'],
-            'preferred_work_location_label' => $preferredWorkLocation['city'].', '.$preferredWorkLocation['state'],
+            ...$preferredWorkLocation,
             'place' => trim((string) ($data['place'] ?? '')),
             'form_date' => $this->nullableDate($data['form_date'] ?? null),
             'signature' => trim((string) ($data['signature'] ?? '')),
@@ -636,6 +594,7 @@ class RecruitmentVerificationController extends Controller
         }
 
         return [
+            ...$this->preferredBranchPayload($data['preferred_work_location_branch_id']),
             'full_name_as_per_aadhar' => trim((string) ($data['full_name_as_per_aadhar'] ?? '')),
             'father_name' => trim((string) ($data['father_name'] ?? '')),
             'mother_name' => trim((string) ($data['mother_name'] ?? '')),
@@ -701,6 +660,8 @@ class RecruitmentVerificationController extends Controller
         $hiring = $candidate->hiring_payload ?? [];
 
         return array_merge([
+            'preferred_work_location_branch_id' => data_get($hiring, 'preferred_work_location_branch_id'),
+            'preferred_work_location_label' => data_get($hiring, 'preferred_work_location_label'),
             'full_name_as_per_aadhar' => $candidate->candidate_name,
             'date_of_birth' => data_get($hiring, 'date_of_birth'),
             'gender' => data_get($hiring, 'gender'),
@@ -731,47 +692,19 @@ class RecruitmentVerificationController extends Controller
         return Branch::query()
             ->where('status', 1)
             ->orderBy('branchName')
-            ->get(['branchId', 'branchName', 'state']);
+            ->get(['branchId', 'branchName', 'city', 'state']);
     }
 
-    private function resolveHiringLocationOption($state, $city): array
+    private function preferredBranchPayload(string $branchId): array
     {
-        $state = trim((string) $state);
-        $city = trim((string) $city);
-
-        if ($state === '') {
-            throw ValidationException::withMessages([
-                'preferred_work_location_state' => 'Preferred work state is required.',
-            ]);
-        }
-
-        if ($city === '') {
-            throw ValidationException::withMessages([
-                'preferred_work_location_city' => 'Preferred work city is required.',
-            ]);
-        }
-
-        $matchedState = collect(array_keys(self::HIRING_LOCATION_OPTIONS))
-            ->first(fn (string $option): bool => strcasecmp($option, $state) === 0);
-
-        if ($matchedState === null) {
-            throw ValidationException::withMessages([
-                'preferred_work_location_state' => 'Selected preferred work state is invalid.',
-            ]);
-        }
-
-        $matchedCity = collect(self::HIRING_LOCATION_OPTIONS[$matchedState] ?? [])
-            ->first(fn (string $option): bool => strcasecmp($option, $city) === 0);
-
-        if ($matchedCity === null) {
-            throw ValidationException::withMessages([
-                'preferred_work_location_city' => 'Selected preferred work city is invalid for the chosen state.',
-            ]);
-        }
-
+        $branch = $this->resolveActiveBranch($branchId);
         return [
-            'state' => $matchedState,
-            'city' => $matchedCity,
+            'preferred_work_location_branch_id' => trim((string) $branch->branchId),
+            'preferred_work_location_branch_name' => trim((string) $branch->branchName),
+            'preferred_work_location_branch_state' => trim((string) $branch->state),
+            'preferred_work_location_state' => trim((string) $branch->state),
+            'preferred_work_location_city' => trim((string) $branch->city),
+            'preferred_work_location_label' => collect([$branch->branchName, $branch->city, $branch->state])->filter()->unique()->implode(', '),
         ];
     }
 

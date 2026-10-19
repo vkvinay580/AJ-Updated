@@ -34,6 +34,8 @@ The administrator change-password Blade view provides a separate accessible visi
 
 Database dumps, employee roster/payroll exports, the May 2026 PF employee allowlist, uploaded ID-card photos, runtime sessions, local `.env` files, and compiled local build output must remain outside Git. Store database backups encrypted with access limited to authorized operators. Create or upgrade a local Attendance database with `php artisan migrate`; an empty database loads `Backend/database/schema/mysql-schema.sql` before later migrations. The schema bootstrap contains structure and migration records only. It does not create branches, employees, credentials, or administrators; provision those records through authorized operational workflows. Restore the optional PF allowlist only from its authorized secure source.
 
+Recruitment hiring and onboarding share `resources/views/recruitment/_preferred_branch.blade.php`. `RecruitmentVerificationController::activeBranches()` supplies only rows from `wp_branches_database` with `status = 1`, and both submissions validate the selected branch before storing its ID, name, city, state, and display label. The legacy state/city payload keys are retained for existing reports. Hiring preference is copied into the default onboarding payload; an inactive or legacy choice must be replaced from the current dropdown.
+
 `MayPfEligibility` treats the private May 2026 PF allowlist as optional runtime enrichment. When the file is absent or unreadable, it returns an empty allowlist instead of failing employee salary summaries; database-backed UAN and `pf_eligible` values continue to apply. A present but malformed JSON file still fails loudly so operators can correct invalid payroll configuration.
 
 The legacy employee payroll/profile table is named `employeedetails` in lowercase. Keep that exact spelling in Eloquent metadata, schema checks, raw queries, migrations, and database bootstrap files. Production MySQL uses `lower_case_table_names=0`, so the older camel-cased spelling fails there even when it appears to work on case-insensitive local database installations.
@@ -88,6 +90,7 @@ MariaDB must be running before using database-backed pages. Existing databases w
 
 ## Documentation change log
 
+- 2026-10-19: Replaced recruitment state/city inputs with a shared active-branch dropdown in hiring and onboarding, added server-side active-branch validation, and retained legacy location payload fields for report compatibility.
 - 2026-10-16: Introduced shared motion timing and reusable route, app-state, dialog, stagger, press-feedback, and submission transitions across the Flutter app; retained reduced-motion support and bumped Android and web to 5.0.40+5041.
 - 2026-10-16: Reworked the Flutter launch screen into a responsive teal-and-gold full-viewport experience, added a matching HTML boot splash that covers web initialization before Flutter's first frame, retained reduced-motion behavior, and bumped Android and web to 5.0.39+5040.
 - 2026-10-15: Added the staged Flutter splash animation, global accessible page transitions, and the refined responsive login surface; bumped Android and web to 5.0.38+5039.

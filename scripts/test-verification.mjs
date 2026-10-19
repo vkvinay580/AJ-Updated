@@ -91,6 +91,10 @@ try {
   await call("/api/verification/requests", { token, method: "POST", body: { id: requestId } });
   const invalid = new FormData(); invalid.set("id", String(requestId)); invalid.set("outcome", "verified");
   await call("/api/verification/requests", { token, method: "POST", body: invalid, expected: 400 });
+  const invalidVideo = new FormData();
+  for (const [key,value] of Object.entries({ id: String(requestId), outcome: "could_not_verify", failureReason: "Video validation test" })) invalidVideo.set(key,value);
+  invalidVideo.set("video", new Blob([Buffer.from("0000ftyp-not-a-video")], { type: "video/mp4" }), "invalid.mp4");
+  await call("/api/verification/requests", { token, method: "POST", body: invalidVideo, expected: 400 });
   const completed = new FormData();
   for (const [key,value] of Object.entries({ id: String(requestId), outcome: "verified", authenticationPersonName: "Test Witness", authenticationPersonPhone: "9000000005", references: JSON.stringify([{ name: "Test Reference", relationship: "Neighbour", phone: "9000000006" }]) })) completed.set(key,value);
   const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j1ioAAAAASUVORK5CYII=", "base64");
@@ -101,6 +105,7 @@ try {
   const profile = await call("/api/admin/customers/1", { cookie: admin });
   assert.equal(profile.verifications[0].status, "verified");
   assert.equal(profile.verificationPhotos.length, 2);
+  assert.equal(profile.verificationVideos.length, 0);
   assert.equal(profile.verificationReferences.length, 1);
   const photoPath = `/api/admin/verifications/${requestId}/photos/${profile.verificationPhotos[0].id}`;
   assert.equal((await fetch(`${base}${photoPath}`, { headers: { Cookie: admin } })).status, 200);

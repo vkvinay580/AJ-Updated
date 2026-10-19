@@ -452,6 +452,11 @@
                     <div class="card-body p-4">
                         <h4 class="mb-3">Final Declaration</h4>
                         <div class="row g-3">
+                            @include('recruitment._preferred_branch', [
+                                'selectedBranchId' => old('preferred_work_location_branch_id', data_get($payload, 'preferred_work_location_branch_id')),
+                                'previousLocationLabel' => data_get($payload, 'preferred_work_location_label'),
+                                'columnClass' => 'col-12',
+                            ])
                             <div class="col-md-4">
                                 <label class="form-label">Place</label>
                                 <input type="text" name="place" class="form-control" value="{{ old('place', data_get($payload, 'place')) }}">

@@ -1,6 +1,18 @@
 "use client";
 
-import { BellRing, CheckCircle2, Download, Eye, EyeOff, RefreshCw, Save, ShieldCheck, Smartphone, UserPlus, Users } from "lucide-react";
+import {
+  BellRing,
+  CheckCircle2,
+  Download,
+  Eye,
+  EyeOff,
+  RefreshCw,
+  Save,
+  ShieldCheck,
+  Smartphone,
+  UserPlus,
+  Users,
+} from "lucide-react";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useRealtimeData } from "@/components/realtime/RealtimeSync";
 import { messageFrom, requestJson } from "@/lib/client-api";
@@ -9,19 +21,368 @@ type Row = Record<string, string | number | boolean | null>;
 type Data = { tes: Row[]; requests: Row[] };
 
 export default function VerificationAdmin() {
-  const [data,setData]=useState<Data>({tes:[],requests:[]});
-  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[showPassword,setShowPassword]=useState(false),[notice,setNotice]=useState("");
-  const load=useCallback(async(silent=false)=>{if(!silent)setLoading(true);try{const{response,data:result}=await requestJson<Data&{error?:string}>("/api/admin/verifications",{cache:"no-store"});if(!response.ok)throw new Error(result.error||"Unable to load verification administration.");setData(result);}catch(caught){setNotice(messageFrom(caught,"Unable to load verification administration."));}finally{if(!silent)setLoading(false);}},[]);
-  useEffect(()=>{let cancelled=false;void requestJson<Data&{error?:string}>("/api/admin/verifications",{cache:"no-store"}).then(({response,data:result})=>{if(cancelled)return;if(!response.ok)throw new Error(result.error||"Unable to load verification administration.");setData(result);}).catch(caught=>{if(!cancelled)setNotice(messageFrom(caught,"Unable to load verification administration."));}).finally(()=>{if(!cancelled)setLoading(false);});return()=>{cancelled=true;};},[]);useRealtimeData(()=>load(true));
-  async function createTe(event:FormEvent<HTMLFormElement>){event.preventDefault();if(saving)return;const form=event.currentTarget;setSaving(true);setNotice("");try{const payload={action:"create-te",...Object.fromEntries(new FormData(form))};const{response,data:result}=await requestJson<{message?:string;error?:string}>("/api/admin/verifications",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});setNotice(result.message||result.error||"Saved.");if(response.ok){form.reset();await load(true);}}catch(caught){setNotice(messageFrom(caught,"Unable to create TE."));}finally{setSaving(false);}}
-  async function toggleTe(row:Row){if(saving)return;setSaving(true);try{const{response,data:result}=await requestJson<{message?:string;error?:string}>("/api/admin/verifications",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"update-te",id:row.id,name:row.name,phone:row.phone||"",active:!row.active})});setNotice(result.message||result.error||"Saved.");if(response.ok)await load(true);}catch(caught){setNotice(messageFrom(caught,"Unable to update TE."));}finally{setSaving(false);}}
-  const open=data.requests.filter(request=>["assigned","in_progress"].includes(String(request.status))).length;
-  const verified=data.requests.filter(request=>request.status==="verified").length;
-  return <div className="admin-page verification-admin-page"><div className="page-title"><div><p>FIELD KYC</p><h1>Aryan Verification</h1><span>Create TE logins, monitor assignments, and download the field-verification application.</span></div><div className="detail-actions"><a className="admin-secondary" href="/downloads/aryan-verification.apk" download="Aryan-Verification.apk"><Download/> Download TE app</a><button className="admin-primary" onClick={()=>void load()} disabled={loading}><RefreshCw/> Refresh</button></div></div>
-    {notice&&<div className="ops-notice" role="status">{notice}<button onClick={()=>setNotice("")} aria-label="Dismiss">×</button></div>}
-    <div className="metric-grid"><article><div><span>Active TEs</span><strong>{data.tes.filter(te=>te.active).length}</strong></div><Users/></article><article><div><span>Open visits</span><strong>{open}</strong></div><BellRing/></article><article><div><span>Verified</span><strong>{verified}</strong></div><CheckCircle2/></article><article><div><span>App</span><strong>Android</strong></div><Smartphone/></article></div>
-    <div className="verification-admin-grid"><section className="panel"><div className="panel-heading"><div><h2>Add TE user</h2><p>The user ID and password are used only in Aryan Verification.</p></div><UserPlus/></div><form className="ops-form admin-assign-form" onSubmit={createTe}><label>TE name<input name="name" maxLength={190} required/></label><label>User ID<input name="userId" minLength={3} maxLength={100} pattern="[A-Za-z0-9._-]+" autoCapitalize="none" required/></label><label>Mobile number<input name="phone" inputMode="numeric" maxLength={10}/></label><label>Password<div className="ops-password-field"><input name="password" type={showPassword?"text":"password"} minLength={8} autoComplete="new-password" required/><button type="button" onClick={()=>setShowPassword(!showPassword)} aria-label={showPassword?"Hide password":"Show password"}>{showPassword?<EyeOff/>:<Eye/>}</button></div></label><button className="admin-primary" disabled={saving}><Save/> Create TE</button></form></section>
-      <section className="panel"><div className="panel-heading"><div><h2>TE directory</h2><p>{data.tes.length} accounts</p></div></div><div className="responsive-table"><table><thead><tr><th>TE</th><th>Login ID</th><th>Mobile</th><th>Open</th><th>Status</th><th>Action</th></tr></thead><tbody>{data.tes.length?data.tes.map(te=><tr key={Number(te.id)}><td><strong>{te.name}</strong></td><td>{te.userId}</td><td>{te.phone?`+91 ${te.phone}`:"—"}</td><td>{te.openCount||0}</td><td><span className={`ops-status ${te.active?"approved":"rejected"}`}>{te.active?"active":"disabled"}</span></td><td><button className="table-action" disabled={saving} onClick={()=>void toggleTe(te)}>{te.active?"Disable":"Enable"}</button></td></tr>):<tr><td colSpan={6}>No TE users yet.</td></tr>}</tbody></table></div></section></div>
-    <section className="panel list-panel"><div className="panel-heading"><div><h2>Verification register</h2><p>Every customer field-verification request and outcome</p></div><ShieldCheck/></div><div className="responsive-table"><table><thead><tr><th>Customer</th><th>Branch / BM</th><th>TE</th><th>Assigned</th><th>Evidence</th><th>Result</th></tr></thead><tbody>{data.requests.length?data.requests.map(row=><tr key={Number(row.id)}><td><strong>{row.customerName}</strong><small>+91 {row.customerPhone}</small><small>{row.customerAddress||"Address not provided"}</small></td><td><strong>{row.branchName}</strong><small>{row.bmName} · +91 {row.bmPhone}</small></td><td>{row.teName}<small>{row.teUserId}</small></td><td>{new Date(String(row.assignedAt)).toLocaleString("en-IN")}</td><td>{row.photoCount||0} photos<small>{row.referenceCount||0} references</small></td><td><span className={`verification-status ${row.status}`}>{String(row.status).replaceAll("_"," ")}</span>{row.verificationNotes&&<small>{row.verificationNotes}</small>}{row.failureReason&&<small>{row.failureReason}</small>}</td></tr>):<tr><td colSpan={6}>No verification requests yet.</td></tr>}</tbody></table></div></section>
-  </div>;
+  const [data, setData] = useState<Data>({ tes: [], requests: [] });
+  const [loading, setLoading] = useState(true),
+    [saving, setSaving] = useState(false),
+    [showPassword, setShowPassword] = useState(false),
+    [notice, setNotice] = useState("");
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const { response, data: result } = await requestJson<
+        Data & { error?: string }
+      >("/api/admin/verifications", { cache: "no-store" });
+      if (!response.ok)
+        throw new Error(
+          result.error || "Unable to load verification administration.",
+        );
+      setData(result);
+    } catch (caught) {
+      setNotice(
+        messageFrom(caught, "Unable to load verification administration."),
+      );
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, []);
+  useEffect(() => {
+    let cancelled = false;
+    void requestJson<Data & { error?: string }>("/api/admin/verifications", {
+      cache: "no-store",
+    })
+      .then(({ response, data: result }) => {
+        if (cancelled) return;
+        if (!response.ok)
+          throw new Error(
+            result.error || "Unable to load verification administration.",
+          );
+        setData(result);
+      })
+      .catch((caught) => {
+        if (!cancelled)
+          setNotice(
+            messageFrom(caught, "Unable to load verification administration."),
+          );
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  useRealtimeData(() => load(true));
+  async function createTe(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (saving) return;
+    const form = event.currentTarget;
+    setSaving(true);
+    setNotice("");
+    try {
+      const payload = {
+        action: "create-te",
+        ...Object.fromEntries(new FormData(form)),
+      };
+      const { response, data: result } = await requestJson<{
+        message?: string;
+        error?: string;
+      }>("/api/admin/verifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      setNotice(result.message || result.error || "Saved.");
+      if (response.ok) {
+        form.reset();
+        await load(true);
+      }
+    } catch (caught) {
+      setNotice(messageFrom(caught, "Unable to create TE."));
+    } finally {
+      setSaving(false);
+    }
+  }
+  async function toggleTe(row: Row) {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const { response, data: result } = await requestJson<{
+        message?: string;
+        error?: string;
+      }>("/api/admin/verifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "update-te",
+          id: row.id,
+          name: row.name,
+          phone: row.phone || "",
+          active: !row.active,
+        }),
+      });
+      setNotice(result.message || result.error || "Saved.");
+      if (response.ok) await load(true);
+    } catch (caught) {
+      setNotice(messageFrom(caught, "Unable to update TE."));
+    } finally {
+      setSaving(false);
+    }
+  }
+  const open = data.requests.filter((request) =>
+    ["assigned", "in_progress"].includes(String(request.status)),
+  ).length;
+  const verified = data.requests.filter(
+    (request) => request.status === "verified",
+  ).length;
+  return (
+    <div className="admin-page verification-admin-page">
+      <div className="page-title">
+        <div>
+          <p>FIELD KYC</p>
+          <h1>Aryan Verification</h1>
+          <span>
+            Create TE logins, monitor assignments, and download the
+            field-verification application.
+          </span>
+        </div>
+        <div className="detail-actions">
+          <a
+            className="admin-secondary"
+            href="/downloads/aryan-verification.apk"
+            download="Aryan-Verification.apk"
+          >
+            <Download /> Download TE app
+          </a>
+          <button
+            className="admin-primary"
+            onClick={() => void load()}
+            disabled={loading}
+          >
+            <RefreshCw /> Refresh
+          </button>
+        </div>
+      </div>
+      {notice && (
+        <div className="ops-notice" role="status">
+          {notice}
+          <button onClick={() => setNotice("")} aria-label="Dismiss">
+            ×
+          </button>
+        </div>
+      )}
+      <div className="metric-grid">
+        <article>
+          <div>
+            <span>Active TEs</span>
+            <strong>{data.tes.filter((te) => te.active).length}</strong>
+          </div>
+          <Users />
+        </article>
+        <article>
+          <div>
+            <span>Open visits</span>
+            <strong>{open}</strong>
+          </div>
+          <BellRing />
+        </article>
+        <article>
+          <div>
+            <span>Verified</span>
+            <strong>{verified}</strong>
+          </div>
+          <CheckCircle2 />
+        </article>
+        <article>
+          <div>
+            <span>App</span>
+            <strong>Android</strong>
+          </div>
+          <Smartphone />
+        </article>
+      </div>
+      <div className="verification-admin-grid">
+        <section className="panel">
+          <div className="panel-heading">
+            <div>
+              <h2>Add TE user</h2>
+              <p>
+                The user ID and password are used only in Aryan Verification.
+              </p>
+            </div>
+            <UserPlus />
+          </div>
+          <form className="ops-form admin-assign-form" onSubmit={createTe}>
+            <label>
+              TE name
+              <input name="name" maxLength={190} required />
+            </label>
+            <label>
+              User ID
+              <input
+                name="userId"
+                minLength={3}
+                maxLength={100}
+                pattern="[A-Za-z0-9._-]+"
+                autoCapitalize="none"
+                required
+              />
+            </label>
+            <label>
+              Mobile number
+              <input name="phone" inputMode="numeric" maxLength={10} />
+            </label>
+            <label>
+              Password
+              <div className="ops-password-field">
+                <input
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  minLength={8}
+                  autoComplete="new-password"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff /> : <Eye />}
+                </button>
+              </div>
+            </label>
+            <button className="admin-primary" disabled={saving}>
+              <Save /> Create TE
+            </button>
+          </form>
+        </section>
+        <section className="panel">
+          <div className="panel-heading">
+            <div>
+              <h2>TE directory</h2>
+              <p>{data.tes.length} accounts</p>
+            </div>
+          </div>
+          <div className="responsive-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>TE</th>
+                  <th>Login ID</th>
+                  <th>Mobile</th>
+                  <th>Open</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.tes.length ? (
+                  data.tes.map((te) => (
+                    <tr key={Number(te.id)}>
+                      <td>
+                        <strong>{te.name}</strong>
+                      </td>
+                      <td>{te.userId}</td>
+                      <td>{te.phone ? `+91 ${te.phone}` : "—"}</td>
+                      <td>{te.openCount || 0}</td>
+                      <td>
+                        <span
+                          className={`ops-status ${te.active ? "approved" : "rejected"}`}
+                        >
+                          {te.active ? "active" : "disabled"}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          className="table-action"
+                          disabled={saving}
+                          onClick={() => void toggleTe(te)}
+                        >
+                          {te.active ? "Disable" : "Enable"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6}>No TE users yet.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+      <section className="panel list-panel">
+        <div className="panel-heading">
+          <div>
+            <h2>Verification register</h2>
+            <p>Every customer field-verification request and outcome</p>
+          </div>
+          <ShieldCheck />
+        </div>
+        <div className="responsive-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th>Branch / BM</th>
+                <th>TE</th>
+                <th>Assigned</th>
+                <th>Evidence</th>
+                <th>Result</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.requests.length ? (
+                data.requests.map((row) => (
+                  <tr key={Number(row.id)}>
+                    <td>
+                      <strong>{row.customerName}</strong>
+                      <small>+91 {row.customerPhone}</small>
+                      <small>
+                        {row.customerAddress || "Address not provided"}
+                      </small>
+                    </td>
+                    <td>
+                      <strong>{row.branchName}</strong>
+                      <small>
+                        {row.bmName} · +91 {row.bmPhone}
+                      </small>
+                    </td>
+                    <td>
+                      {row.teName}
+                      <small>{row.teUserId}</small>
+                    </td>
+                    <td>
+                      {new Date(String(row.assignedAt)).toLocaleString("en-IN")}
+                    </td>
+                    <td>
+                      {row.photoCount || 0} photos
+                      <small>
+                        {row.videoCount || 0} videos · {row.referenceCount || 0}{" "}
+                        references
+                      </small>
+                    </td>
+                    <td>
+                      <span className={`verification-status ${row.status}`}>
+                        {String(row.status).replaceAll("_", " ")}
+                      </span>
+                      {row.verificationNotes && (
+                        <small>{row.verificationNotes}</small>
+                      )}
+                      {row.failureReason && <small>{row.failureReason}</small>}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6}>No verification requests yet.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
 }

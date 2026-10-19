@@ -20,6 +20,8 @@ The application uses a light cream background (`#FDF4E6`), deep teal (`#006A64`)
 
 Keep the local database and web server running while using the app. If the website cannot be reached, restart the server using the developer guide. Local email is written to Laravel logs.
 
+Hiring and joining forms now ask for a preferred work location from a dropdown of currently active Aryan Gold branches. The hiring selection is carried into the joining form when that branch remains active. If an older saved choice is no longer available, select a current branch before submitting.
+
 The hosted employee web app now loads its Flutter scripts, images, fonts, and WebAssembly files on the production cPanel server even when PHP's optional file-type detector is unavailable. If an old browser tab still shows **Frontend web build not found** or **Server Error**, close it and reopen `https://attendance.aryangold.in` so the repaired bootstrap files are requested again.
 
 Employee app sign-in now works on case-sensitive Linux production databases. If the app previously returned **Server Error** after valid branch ID, employee ID, and password details were entered, retry the same credentials; no APK or endpoint change is required.
@@ -59,6 +61,7 @@ Branch-portal sign-in now explains the exact corrective action: an employee with
 
 ## Documentation change log
 
+- 2026-10-19: Replaced free-form hiring and joining location choices with a required dropdown of currently active Aryan Gold branches and carried the hiring preference into joining.
 - 2026-10-16: Added a shared motion system for page navigation, authentication and dashboard state changes, dialogs, bottom sheets, staggered shortcut entrances, press feedback, submission controls, and loading-to-result changes; preserved reduced-motion behavior and released Android and web version 5.0.40 (5041).
 - 2026-10-16: Redesigned the Aryan Gold launch experience with premium teal-and-gold motion, responsive concentric brand rings, a secure-workspace progress treatment, and a full-viewport web boot splash; released Android and web version 5.0.39 (5040).
 - 2026-10-15: Added the animated Aryan Gold splash screen, subtle cross-platform page transitions with reduced-motion support, and a richer responsive employee login design; released Android and web version 5.0.38 (5039).

@@ -12,6 +12,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:workmanager/workmanager.dart';
+import 'package:video_compress/video_compress.dart';
+import 'visit_video.dart';
 
 const apiBase = String.fromEnvironment(
   'API_BASE',
@@ -98,7 +100,9 @@ Future<bool> pollVerificationAssignments() async {
       shownIds.add(assignmentId);
       await prefs.setStringList(
         'notified_request_ids',
-        shownIds.length > 500 ? shownIds.sublist(shownIds.length - 500) : shownIds,
+        shownIds.length > 500
+            ? shownIds.sublist(shownIds.length - 500)
+            : shownIds,
       );
     }
   } catch (_) {}
@@ -783,6 +787,9 @@ class RequestDetailPage extends StatefulWidget {
 }
 
 class _RequestDetailPageState extends State<RequestDetailPage> {
+  VisitVideo? visitVideo;
+  bool preparingVideo = false;
+  double compressionProgress = 0;
   final authName = TextEditingController(),
       authRelationship = TextEditingController(),
       authPhone = TextEditingController(),
@@ -836,7 +843,62 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
     }
   }
 
+  Future<void> takeVideo() async {
+    if (saving || preparingVideo) return;
+    String? capturedPath;
+    setState(() {
+      preparingVideo = true;
+      compressionProgress = 0;
+      error = '';
+    });
+    final progress = VideoCompress.compressProgress$.subscribe((value) {
+      if (mounted) {
+        setState(() => compressionProgress = (value / 100).clamp(0, 1));
+      }
+    });
+    try {
+      final captured = await picker.pickVideo(
+        source: ImageSource.camera,
+        maxDuration: const Duration(minutes: 2),
+      );
+      if (captured == null) return;
+      capturedPath = captured.path;
+      final prepared = await compressVisitVideo(captured.path);
+      if (!mounted) {
+        await prepared.file.delete();
+        return;
+      }
+      final old = visitVideo;
+      setState(() => visitVideo = prepared);
+      if (old != null &&
+          old.file.path != prepared.file.path &&
+          await old.file.exists()) {
+        await old.file.delete();
+      }
+    } catch (caught) {
+      if (mounted) {
+        setState(
+          () => error = caught.toString().replaceFirst('FormatException: ', ''),
+        );
+      }
+    } finally {
+      progress.unsubscribe();
+      if (capturedPath != null && capturedPath != visitVideo?.file.path) {
+        final original = File(capturedPath);
+        if (await original.exists()) await original.delete();
+      }
+      if (mounted) setState(() => preparingVideo = false);
+    }
+  }
+
+  Future<void> removeVideo() async {
+    final old = visitVideo;
+    setState(() => visitVideo = null);
+    if (old != null && await old.file.exists()) await old.file.delete();
+  }
+
   Future<void> submit() async {
+    if (saving || preparingVideo) return;
     setState(() {
       saving = true;
       error = '';
@@ -868,7 +930,23 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
           ),
         );
       }
-      final response = await http.Response.fromStream(await request.send());
+      if (visitVideo != null) {
+        request.files.add(
+          await http.MultipartFile.fromPath(
+            'video',
+            visitVideo!.file.path,
+            filename: 'visit-video.mp4',
+          ),
+        );
+      }
+      if (request.contentLength > 40 * 1024 * 1024) {
+        throw const FormatException(
+          'Photos and video together must be smaller than 40 MB. Remove some photos or record a shorter video.',
+        );
+      }
+      final response = await http.Response.fromStream(
+        await request.send().timeout(const Duration(minutes: 5)),
+      );
       if (response.statusCode != 200) {
         throw Exception(
           responseMessage(response, 'Unable to submit verification.'),
@@ -895,6 +973,15 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
   @override
   void dispose() {
     authName.dispose();
+    if (preparingVideo) unawaited(VideoCompress.cancelCompression());
+    final videoFile = visitVideo?.file;
+    if (videoFile != null) {
+      unawaited(
+        videoFile.exists().then((exists) async {
+          if (exists) await videoFile.delete();
+        }),
+      );
+    }
     authRelationship.dispose();
     authPhone.dispose();
     notes.dispose();
@@ -1048,6 +1135,43 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
               ],
             ),
             DetailCard(
+              title: 'Visit video (optional)',
+              icon: Icons.videocam_outlined,
+              children: [
+                const Text(
+                  'Record up to 2 minutes. The video is compressed on your phone before upload.',
+                ),
+                const SizedBox(height: 12),
+                if (preparingVideo) ...[
+                  LinearProgressIndicator(
+                    value: compressionProgress > 0 ? compressionProgress : null,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Preparing video… ${(compressionProgress * 100).round()}%',
+                  ),
+                ] else ...[
+                  OutlinedButton.icon(
+                    onPressed: saving ? null : takeVideo,
+                    icon: const Icon(Icons.videocam),
+                    label: Text(
+                      visitVideo == null ? 'Record video' : 'Record again',
+                    ),
+                  ),
+                  if (visitVideo != null) ...[
+                    Text(
+                      '${(visitVideo!.durationMs / 1000).ceil()} seconds · ${(visitVideo!.compressedBytes / 1048576).toStringAsFixed(1)} MB ready to upload',
+                    ),
+                    TextButton.icon(
+                      onPressed: saving ? null : removeVideo,
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text('Remove video'),
+                    ),
+                  ],
+                ],
+              ],
+            ),
+            DetailCard(
               title: 'Authentication person',
               icon: Icons.verified_user_outlined,
               children: [
@@ -1155,7 +1279,7 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
                 child: Text(error, style: const TextStyle(color: Colors.red)),
               ),
             FilledButton.icon(
-              onPressed: saving ? null : submit,
+              onPressed: saving || preparingVideo ? null : submit,
               icon: const Icon(Icons.cloud_upload_outlined),
               label: Text(saving ? 'Submitting…' : 'Submit final result'),
               style: FilledButton.styleFrom(
@@ -1177,7 +1301,7 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '${request.data['photoCount']} photos · ${request.data['referenceCount']} references',
+                  '${request.data['photoCount']} photos · ${request.data['videoCount'] ?? 0} videos · ${request.data['referenceCount']} references',
                 ),
               ],
             ),

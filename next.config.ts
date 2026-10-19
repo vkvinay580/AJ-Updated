@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  serverExternalPackages: ["@ffprobe-installer/ffprobe"],
   allowedDevOrigins: ["127.0.0.1", "192.168.1.71"],
   experimental: {
     useTypeScriptCli: false,

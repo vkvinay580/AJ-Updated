@@ -1,6 +1,6 @@
 # Aryan Verification
 
-Android application for admin-created TE accounts. A branch manager assigns a customer from billing; the TE sees customer address/contact details and the requesting BM's name/mobile, records a home visit with multiple photos, references and an authentication person, and submits **Verified** or **Could not be verified**. Results and protected evidence appear in customer KYC. The requesting BM receives an in-app result notification.
+Android application for admin-created TE accounts. A branch manager assigns a customer from billing; the TE sees customer address/contact details and the requesting BM's name/mobile, records a home visit with multiple photos, an optional compressed video, references and an authentication person, and submits **Verified** or **Could not be verified**. Results and protected evidence appear in customer KYC. The requesting BM receives an in-app result notification.
 
 ## Build and distribute
 
@@ -39,8 +39,9 @@ These build values are the public Android app configuration. The service-account
 - Admin creates TE user ID/password and can enable or disable access.
 - BM selects or adds a customer in billing, assigns a TE, and supplies a contact mobile/instructions. Only one active request is allowed per customer; billing is not blocked.
 - TE signs in, opens an assignment, calls customer/BM if needed, and starts the visit.
-- Verified requires at least two photos, one reference with a valid mobile, and authentication person's name/mobile. Up to 12 photos and 10 references are accepted; images are limited to 8 MB each and 40 MB combined. Could-not-verify requires a reason.
-- Completed requests cannot be resubmitted. Photos are stored privately in `storage/verification`; company-authenticated administrators see the result, references and evidence under KYC.
+- Verified requires at least two photos, one reference with a valid mobile, and authentication person's name/mobile. Up to 12 photos and 10 references are accepted; images are limited to 8 MB each. Could-not-verify requires a reason.
+- One optional visit video can be recorded from the camera for up to two minutes. The app compresses it to 640×480 at 24 fps before upload; the compressed MP4 is limited to 25 MB and all evidence in one submission is limited to 40 MB. The API independently validates MP4/H.264 format, duration, resolution, and size with the bundled ffprobe binary.
+- Completed requests cannot be resubmitted. Photos and videos are stored privately in `storage/verification`; company-authenticated administrators can play the video and see the result, references and evidence under KYC.
 - TE sessions expire after 30 days and are invalidated when admin disables the account or resets its password.
 
 The backend endpoints are `/api/verification/login`, `/session`, `/device`, and `/requests` under `/api/verification`. They use TE bearer credentials and scope assignments to the logged-in TE. Schema lives in `../database/schema.sql`.

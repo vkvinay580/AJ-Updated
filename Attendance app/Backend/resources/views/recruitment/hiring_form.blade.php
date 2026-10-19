@@ -3,8 +3,6 @@
     $workExperiences = old('work_experiences', data_get($payload, 'work_experiences', [['company_name' => '', 'designation' => '', 'experience' => '']]));
     $references = old('references', data_get($payload, 'references', [['name' => '', 'contact_number' => '', 'designation' => '', 'relationship' => '']]));
     $branches = $branches ?? collect();
-    $hiringLocationOptions = $hiringLocationOptions ?? [];
-    $stateOptions = array_keys($hiringLocationOptions);
     $positionOptions = $positionOptions ?? [];
     $requiresVideoInterview = (bool) ($requiresVideoInterview ?? true);
     $storedPosition = old('position_applied_for', data_get($payload, 'position_applied_for'));
@@ -29,8 +27,6 @@
 
     $isWhatsappSame = old('is_whatsapp_same_as_contact', data_get($payload, 'is_whatsapp_same_as_contact', true));
     $submissionCode = session('submission_code');
-    $preferredWorkLocationState = old('preferred_work_location_state', data_get($payload, 'preferred_work_location_state', data_get($payload, 'preferred_work_location_branch_state')));
-    $preferredWorkLocationCity = old('preferred_work_location_city', data_get($payload, 'preferred_work_location_city', data_get($payload, 'preferred_work_location_branch_name')));
     $showPositionDropdown = $positionOptions !== [] || ! $requiresVideoInterview;
 @endphp
 <!doctype html>
@@ -663,22 +659,10 @@
                 <div class="card-body p-4">
                     <h4 class="mb-3" data-i18n="section.final">Final Section</h4>
                     <div class="row g-3">
-                        <div class="col-lg-3">
-                            <label class="form-label" data-i18n="field.preferred_state">Preferred Work State</label>
-                            <select name="preferred_work_location_state" class="form-select" id="preferredWorkLocationState" required>
-                                <option value="">Select State</option>
-                                @foreach ($stateOptions as $stateOption)
-                                    <option value="{{ $stateOption }}" @selected($preferredWorkLocationState === $stateOption)>{{ $stateOption }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="col-lg-3">
-                            <label class="form-label" data-i18n="field.preferred_city">Preferred Work City</label>
-                            <select name="preferred_work_location_city" class="form-select" id="preferredWorkLocationCity" required data-selected-city="{{ $preferredWorkLocationCity }}">
-                                <option value="">Select City</option>
-                            </select>
-                            <div class="form-text" data-i18n="field.choose_city_help">Choose a city from the selected state.</div>
-                        </div>
+                        @include('recruitment._preferred_branch', [
+                            'selectedBranchId' => old('preferred_work_location_branch_id', data_get($payload, 'preferred_work_location_branch_id')),
+                            'previousLocationLabel' => data_get($payload, 'preferred_work_location_label'),
+                        ])
                         <div class="col-lg-6">
                             <label class="form-label" data-i18n="field.place">Place</label>
                             <input type="text" name="place" class="form-control" value="{{ old('place', data_get($payload, 'place')) }}">
@@ -1422,7 +1406,6 @@
 
         document.addEventListener('DOMContentLoaded', function () {
             const languageStorageKey = 'aryan_gold_hiring_form_language';
-            const hiringLocationOptions = @json($hiringLocationOptions);
             const requiresVideoInterview = @json($requiresVideoInterview);
             const questionBank = @json($questionBank);
             const fixedOpeningQuestion = 'Tell us about yourself and the work you handled most recently.';
@@ -1445,8 +1428,6 @@
             const resumeAutofillButton = document.getElementById('resumeAutofillButton');
             const resumeAutofillStatus = document.getElementById('resumeAutofillStatus');
             const form = document.getElementById('hiringForm');
-            const preferredWorkLocationState = document.getElementById('preferredWorkLocationState');
-            const preferredWorkLocationCity = document.getElementById('preferredWorkLocationCity');
 
             const startInterviewButton = document.getElementById('startInterviewButton');
             const previewInterviewButton = document.getElementById('previewInterviewButton');
@@ -1571,32 +1552,6 @@
 
             function fixedOpeningQuestionText() {
                 return t('interview.fixed_opening_question');
-            }
-
-            function syncPreferredWorkCities() {
-                if (!preferredWorkLocationState || !preferredWorkLocationCity) {
-                    return;
-                }
-
-                const selectedState = preferredWorkLocationState.value || '';
-                const savedCity = preferredWorkLocationCity.dataset.selectedCity || '';
-                const previousCity = preferredWorkLocationCity.value || '';
-                const availableCities = Array.isArray(hiringLocationOptions[selectedState]) ? hiringLocationOptions[selectedState] : [];
-                const targetCity = availableCities.includes(previousCity)
-                    ? previousCity
-                    : (availableCities.includes(savedCity) ? savedCity : '');
-
-                preferredWorkLocationCity.innerHTML = `<option value="">${hiringFormOptionTranslations[window.hiringFormI18n.currentLanguage]?.['Select City'] || 'Select City'}</option>`;
-
-                availableCities.forEach((city) => {
-                    const option = document.createElement('option');
-                    option.value = city;
-                    option.textContent = city;
-                    option.selected = city === targetCity;
-                    preferredWorkLocationCity.appendChild(option);
-                });
-
-                preferredWorkLocationCity.dataset.selectedCity = targetCity;
             }
 
             function syncWhatsappVisibility() {
@@ -2190,29 +2145,6 @@
             });
 
             form.addEventListener('submit', function (event) {
-                if (preferredWorkLocationState && preferredWorkLocationCity) {
-                    const selectedState = preferredWorkLocationState.value || '';
-                    const selectedCity = preferredWorkLocationCity.value || '';
-                    const allowedCities = Array.isArray(hiringLocationOptions[selectedState]) ? hiringLocationOptions[selectedState] : [];
-
-                    if (!selectedState) {
-                        event.preventDefault();
-                        preferredWorkLocationState.reportValidity();
-                        preferredWorkLocationState.focus();
-                        return;
-                    }
-
-                    if (!selectedCity || !allowedCities.includes(selectedCity)) {
-                        event.preventDefault();
-                        preferredWorkLocationCity.setCustomValidity(t('validation.valid_city'));
-                        preferredWorkLocationCity.reportValidity();
-                        preferredWorkLocationCity.focus();
-                        return;
-                    }
-
-                    preferredWorkLocationCity.setCustomValidity('');
-                }
-
                 if (requiresVideoInterview && (!interviewVideoFile || !interviewVideoFile.files || !interviewVideoFile.files.length)) {
                     event.preventDefault();
                     setTranslatedStatus(interviewStatus, 'interview.status_complete_before_submit', 'alert alert-danger mb-3');
@@ -2224,14 +2156,6 @@
             });
 
             window.addEventListener('beforeunload', cleanupInterviewSession);
-            preferredWorkLocationState?.addEventListener('change', function () {
-                preferredWorkLocationCity.dataset.selectedCity = '';
-                syncPreferredWorkCities();
-            });
-            preferredWorkLocationCity?.addEventListener('change', function () {
-                this.dataset.selectedCity = this.value || '';
-                this.setCustomValidity('');
-            });
             const savedLanguage = (() => {
                 try {
                     return window.localStorage.getItem(languageStorageKey) || 'en';
@@ -2239,7 +2163,6 @@
                     return 'en';
                 }
             })();
-            syncPreferredWorkCities();
             syncWhatsappVisibility();
             syncCustomPositionVisibility();
             syncResumeAutofillButton();

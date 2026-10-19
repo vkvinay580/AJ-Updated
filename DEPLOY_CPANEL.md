@@ -83,16 +83,16 @@ Enable **AutoSSL** for the domain before accepting real KYC documents. Camera ca
 
 ## Persistent files and backups
 
-KYC uploads, customer company ID cards, and old-gold wearing images are stored under `storage/kyc`, branch pledge bills under `storage/pledges`, private chat attachments under `storage/chat`, and TE visit photos under `storage/verification`. Keep these folders writable by the Node.js application and back them up together with the MySQL database. Never move them under `public`; documents are served only through authenticated routes.
+KYC uploads, customer company ID cards, and old-gold wearing images are stored under `storage/kyc`, branch pledge bills under `storage/pledges`, private chat attachments under `storage/chat`, and TE visit photos/videos under `storage/verification`. Keep these folders writable by the Node.js application and back them up together with the MySQL database. Never move them under `public`; documents are served only through authenticated routes.
 
 Recommended permissions are `750` for `storage` and its subdirectories, subject to the hosting provider's ownership configuration.
 
 ## Aryan Verification deployment
 
-For an existing installation, run `node scripts/setup-verification.mjs` before activating the new code to add only the seven verification tables in `database/schema.sql`. Fresh installations use `npm run db:setup`. Include that schema file and `public/downloads/aryan-verification.apk` in the deployment package. Confirm the download card on `https://aryangold.in/login` and APK at `https://aryangold.in/downloads/aryan-verification.apk` after restarting.
+For an existing installation, run `node scripts/setup-verification.mjs` before activating the new code to add only the eight verification tables in `database/schema.sql`. Fresh installations use `npm run db:setup`. Run `npm install` so the production package contains the ffprobe binary used to validate visit videos. Include the schema file and `public/downloads/aryan-verification.apk` in the deployment package. Confirm the download card on `https://aryangold.in/login` and APK at `https://aryangold.in/downloads/aryan-verification.apk` after restarting.
 
 For instant FCM notifications, set `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY` from a service account authorized for Firebase Cloud Messaging, and build the app with the matching public Android Firebase configuration described in `verification_app/README.md`. Never bundle the service-account key in the APK or Git. Without FCM configuration, Android background work periodically checks assignments; timing depends on connectivity and battery restrictions.
 
-Allow request bodies of at least 42 MB for verification uploads (up to 12 images, 8 MB each, 40 MB total). Check the full workflow using dedicated test accounts: create TE, assign customer in billing, receive assignment, submit both outcomes, inspect KYC evidence, and check the requesting BM's notification. Verification photographs remain behind authenticated routes.
+Allow request bodies of at least 42 MB for verification uploads (up to 12 images at 8 MB each, one compressed two-minute MP4 at 25 MB, and 40 MB total per submission). Check the full workflow using dedicated test accounts: create TE, assign customer in billing, receive assignment, submit both outcomes with photo/video evidence, inspect KYC playback, and check the requesting BM's notification. Verification photographs and videos remain behind authenticated routes.
 
 Team chat camera capture, voice notes, and browser notifications require HTTPS plus user-granted camera, microphone, and notification permissions. The application accepts up to 10 chat attachments per send, limited to 20 MB each and 50 MB combined; confirm the hosting request-body limit is at least 50 MB if large multi-file sends are required.

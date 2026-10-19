@@ -174,6 +174,19 @@ CREATE TABLE IF NOT EXISTS customer_verification_photos (
   CONSTRAINT fk_verification_photo_request FOREIGN KEY (request_id) REFERENCES customer_verification_requests(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS customer_verification_videos (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  request_id BIGINT UNSIGNED NOT NULL,
+  file_path VARCHAR(500) NOT NULL,
+  original_name VARCHAR(255) NOT NULL,
+  mime_type VARCHAR(100) NOT NULL DEFAULT 'video/mp4',
+  duration_ms INT UNSIGNED NOT NULL,
+  byte_size INT UNSIGNED NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id), UNIQUE KEY uq_verification_video_request (request_id),
+  CONSTRAINT fk_verification_video_request FOREIGN KEY (request_id) REFERENCES customer_verification_requests(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS customer_verification_references (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   request_id BIGINT UNSIGNED NOT NULL,
