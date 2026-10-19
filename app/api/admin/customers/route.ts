@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import type { RowDataPacket } from "mysql2";
 import { apiError, cleanPhone, cleanText, requestIp } from "@/lib/api";
 import { businessAuthenticated } from "@/lib/business-actor";
+import { getBranchSession } from "@/lib/branch-auth";
 import { removeCustomerFile, storeCustomerFile } from "@/lib/customer-files";
 import { encryptSensitive, execute, one, rows, stableHash, transaction } from "@/lib/db";
+import { notifyTe } from "@/lib/verification-push";
 
 export async function GET(request: NextRequest) {
   const { error, actor: session } = await businessAuthenticated(request);
@@ -44,12 +46,25 @@ export async function POST(request: NextRequest) {
   const employerName = cleanText(form.get("employerName"), 190);
   const employerAddress = cleanText(form.get("employerAddress"), 500);
   const employmentDesignation = cleanText(form.get("employmentDesignation"), 120);
+  const requestHouseVerification = form.get("requestHouseVerification") === "1";
+  const verificationTeUserId = Number(form.get("verificationTeUserId"));
+  const verificationBmPhone = cleanPhone(form.get("verificationBmPhone"));
+  const verificationNotes = cleanText(form.get("verificationNotes"), 1000);
   if (phone.length !== 10) return apiError("Enter a valid 10-digit phone number.");
   if (name.length < 2) return apiError("Customer name is required.");
   if (!/^\d{12}$/.test(aadhaar) && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)) return apiError("A valid Aadhaar or PAN is required.");
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return apiError("Enter a valid email address.");
   if (gstin && !/^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]$/.test(gstin)) return apiError("Enter a valid 15-character GSTIN.");
   if (stateCode && !/^\d{2}$/.test(stateCode)) return apiError("State code must contain 2 digits.");
+
+  const branchSession = requestHouseVerification ? await getBranchSession() : null;
+  if (requestHouseVerification && (!session.branchId || !session.employeeId || !branchSession)) return apiError("House verification can only be requested from an active branch session.", 403);
+  if (requestHouseVerification && (!Number.isInteger(verificationTeUserId) || verificationTeUserId < 1)) return apiError("Select an active TE for house verification.");
+  if (requestHouseVerification && verificationBmPhone.length !== 10) return apiError("Enter the branch manager's valid 10-digit mobile number.");
+  const verificationTe = requestHouseVerification
+    ? await one<RowDataPacket>("SELECT id,name FROM te_users WHERE id=? AND active=1", [verificationTeUserId])
+    : null;
+  if (requestHouseVerification && !verificationTe) return apiError("The selected TE account is unavailable.", 409);
 
   const existing = await one<RowDataPacket & { id: number }>("SELECT id FROM customers WHERE company_id = ? AND phone = ?", [session.companyId, phone]);
   if (existing) return NextResponse.json({ existing: true, customerId: existing.id }, { status: 409 });
@@ -72,7 +87,7 @@ export async function POST(request: NextRequest) {
     const storedOldGoldWearingImage = oldGoldWearingImage instanceof File && oldGoldWearingImage.size ? await storeCustomerFile(oldGoldWearingImage, session.companyId, false) : null;
     if (storedOldGoldWearingImage) savedFiles.push(storedOldGoldWearingImage.path);
 
-    const customerId = await transaction(async (connection) => {
+    const created = await transaction(async (connection) => {
       const result = await execute(`INSERT INTO customers
         (company_id, phone, name, email, address, city, state, gstin, state_code, place_of_supply, postal_code, customer_image_path,
           employer_name, employer_address, employment_designation, company_id_card_path, company_id_card_original_name, company_id_card_mime_type,
@@ -94,11 +109,25 @@ export async function POST(request: NextRequest) {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
       if (/^\d{12}$/.test(aadhaar)) await execute(insertKycSql, [newCustomerId, session.companyId, "aadhaar", encryptSensitive(aadhaar), stableHash(aadhaar), aadhaar.slice(-4), storedAadhaar?.path || null, aadhaarFile instanceof File ? cleanText(aadhaarFile.name, 150) : null, storedAadhaar?.mime || null, session.employeeId, session.adminId], connection);
       if (/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)) await execute(insertKycSql, [newCustomerId, session.companyId, "pan", encryptSensitive(pan), stableHash(pan), pan.slice(-4), storedPan?.path || null, panFile instanceof File ? cleanText(panFile.name, 150) : null, storedPan?.mime || null, session.employeeId, session.adminId], connection);
+      let verificationRequestId: number | null = null;
+      if (requestHouseVerification && branchSession && verificationTe) {
+        const verification = await execute(`INSERT INTO customer_verification_requests
+          (company_id,customer_id,te_user_id,branch_id,branch_name,bm_employee_id,bm_name,bm_phone,request_notes)
+          VALUES (?,?,?,?,?,?,?,?,?)`, [session.companyId, newCustomerId, verificationTeUserId, branchSession.branchId, branchSession.branchName,
+          branchSession.employeeId, branchSession.employeeName, verificationBmPhone, verificationNotes || null], connection);
+        verificationRequestId = verification.insertId;
+      }
       await execute("INSERT INTO audit_logs (admin_id, company_id, action, entity_type, entity_id, ip_address) VALUES (?, ?, 'customer_created', 'customer', ?, ?)",
         [session.adminId, session.companyId, newCustomerId, requestIp(request)], connection);
-      return newCustomerId;
+      return { customerId: newCustomerId, verificationRequestId };
     });
-    return NextResponse.json({ customerId }, { status: 201 });
+    let verificationMessage: string | null = null;
+    if (created.verificationRequestId && branchSession && verificationTe) {
+      const push = await notifyTe(verificationTeUserId, created.verificationRequestId, name, branchSession.branchName)
+        .catch(() => ({ configured: false, delivered: 0 }));
+      verificationMessage = `House verification assigned to ${verificationTe.name}.${push.delivered ? " Phone notification sent." : " It is available in the Aryan Verification app."}`;
+    }
+    return NextResponse.json({ ...created, verificationMessage }, { status: 201 });
   } catch (caught) {
     for (const file of savedFiles) removeCustomerFile(file);
     const message = caught instanceof Error ? caught.message : "Unable to create customer.";

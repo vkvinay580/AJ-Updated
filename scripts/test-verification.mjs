@@ -123,6 +123,17 @@ try {
   failed.set("failureReason", "No one present during visit");
   await call("/api/verification/requests", { token, method: "POST", body: failed });
   assert.equal((await call("/api/branch/verifications", { cookie: bm })).notifications.length, 2);
+  const registration = new FormData();
+  for (const [key,value] of Object.entries({ phone: "9000000007", name: "Registration Verification Customer", aadhaar: "111122223333",
+    address: "New customer test home", requestHouseVerification: "1", verificationTeUserId: String(secondTe.id),
+    verificationBmPhone: "9000000004", verificationNotes: "Requested during customer registration" })) registration.set(key,value);
+  const registered = await call("/api/branch/customers", { cookie: bm, method: "POST", body: registration, expected: 201 });
+  assert.ok(registered.customerId);
+  assert.ok(registered.verificationRequestId);
+  assert.match(registered.verificationMessage, /House verification assigned/);
+  const registrationAssignments = await call("/api/verification/requests", { token: secondToken });
+  assert.ok(registrationAssignments.requests.some(request => request.id === registered.verificationRequestId && request.customerName === "Registration Verification Customer"));
+  console.log("PASS: branch customer registration atomically creates and assigns an optional house verification request");
   await call("/api/admin/verifications", { cookie: admin, method: "POST", body: { action: "update-te", id: te.id, name: "Test TE", active: false } });
   await call("/api/verification/requests", { token, expected: 401 });
   await call("/api/verification/login", { method: "POST", body: { userId: "test.te", password }, expected: 401 });

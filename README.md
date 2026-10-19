@@ -97,7 +97,7 @@ README for APK builds, installation, and the website integration deployment step
 
 Source and build instructions are in [verification_app](verification_app/README.md). The Android APK is packaged at `public/downloads/aryan-verification.apk` and linked from `/login`, branch billing, and Admin → Verification & TEs. After deployment, download it at `https://aryangold.in/downloads/aryan-verification.apk`.
 
-Create a TE in Admin → Verification & TEs, then select or register a customer in branch billing and send a verification request. A verified result requires at least two visit photos, one reference, and an authentication person's name/mobile; the TE may also attach one compressed visit video up to two minutes. Could-not-verify requires a reason. Billing remains available while a visit is pending.
+Create a TE in Admin → Verification & TEs, then request house verification either while registering a new branch customer or later from branch billing. Customer creation and its optional initial verification assignment are saved together. A verified result requires at least two visit photos, one reference, and an authentication person's name/mobile; the TE may also attach one compressed visit video up to two minutes. Could-not-verify requires a reason. Billing remains available while a visit is pending.
 
 The app checks for assignments in Android background work at a requested 15-minute interval; Android may defer delivery. Instant push requires server Firebase credentials and matching Firebase Android build configuration, as documented in the app README. No Firebase secrets are included in the APK.
 

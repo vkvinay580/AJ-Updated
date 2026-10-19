@@ -32,7 +32,7 @@ For non-Android builds or CI environments without `google-services.json`, the sa
 ## Workflow and storage
 
 - Admin creates TE user ID/password and can enable or disable access.
-- BM selects or adds a customer in billing, assigns a TE, and supplies a contact mobile/instructions. Only one active request is allowed per customer; billing is not blocked.
+- BM can assign a TE while registering a new customer or later from billing, and supplies a contact mobile/instructions. Customer registration and its optional initial assignment are committed together. Only one active request is allowed per customer; billing is not blocked.
 - TE signs in, opens an assignment, calls customer/BM if needed, and starts the visit.
 - Verified requires at least two photos, one reference with a valid mobile, and authentication person's name/mobile. Up to 12 photos and 10 references are accepted; images are limited to 8 MB each. Could-not-verify requires a reason.
 - One optional visit video can be recorded from the camera for up to two minutes. The app compresses it to 640×480 at 24 fps before upload; the compressed MP4 is limited to 25 MB and all evidence in one submission is limited to 40 MB. The API independently validates MP4/H.264 format, duration, resolution, and size with the bundled ffprobe binary.

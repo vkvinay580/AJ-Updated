@@ -35,6 +35,7 @@ export default function BillForm({ portal = "admin", fixedRates, availableFundPa
   const apiBase = `/api/${portal}`;
   const pageBase = `/${portal}`;
   const initial = params.get("customerId");
+  const verificationRequestedAtCreation = params.get("verificationRequested") === "1";
   const pledgeId = isBranch ? params.get("pledgeId") : null;
   const fixedRate = (nextType: string) => Number(nextType === "purchase" ? fixedRates?.purchaseRate : fixedRates?.saleRate) / 100;
   const newItem = () => ({ ...blank(), ratePerGram: fixedRates ? String(fixedRate("purchase")) : "" });
@@ -115,10 +116,10 @@ export default function BillForm({ portal = "admin", fixedRates, availableFundPa
     if(!isBranch||!customer)return;
     let cancelled=false;
     void requestJson<{tes?:VerificationOption[];requests?:VerificationHistory[];error?:string}>(`/api/branch/verifications?customerId=${customer.id}`,{cache:"no-store"}).then(({response,data})=>{
-      if(cancelled)return;if(!response.ok)throw new Error(data.error||"Unable to load verification options.");setVerificationOptions(data.tes||[]);setVerificationHistory(data.requests||[]);setVerificationNotice("");setVerificationTe("");setVerificationNotes("");
+      if(cancelled)return;if(!response.ok)throw new Error(data.error||"Unable to load verification options.");setVerificationOptions(data.tes||[]);setVerificationHistory(data.requests||[]);setVerificationNotice(verificationRequestedAtCreation?"House verification was assigned when this customer was added.":"");setVerificationTe("");setVerificationNotes("");
     }).catch(caught=>{if(!cancelled)setVerificationNotice(messageFrom(caught,"Unable to load verification options."));});
     return()=>{cancelled=true;};
-  },[isBranch,customer]);
+  },[isBranch,customer,verificationRequestedAtCreation]);
 
   async function sendForVerification(){
     if(!customer||!verificationTe||bmPhone.replace(/\D/g,"").length!==10){setVerificationNotice("Select a TE and enter the branch manager's 10-digit mobile number.");return;}
