@@ -3,6 +3,8 @@ import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { getAttendanceDirectory } from "@/lib/attendance";
+import { aryanGoldBuyersLinks } from "@/lib/public-links";
+import ContactPopup from "@/components/home/ContactPopup";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
@@ -31,10 +33,11 @@ export default async function Home() {
   const branches = await loadBranches();
 
   return <>
+    <ContactPopup />
     <section className="hero-section"><div className="hero-glow" /><div className="hero-content">
       <p className="eyebrow"><Sparkles size={15} /> Trusted precious metal specialists</p><h1>Precious metals,<br/><em>valued with confidence.</em></h1>
       <p className="hero-copy">Buy or sell gold and silver bars, coins, and jewellery through a transparent, secure process. Fair valuation. Clear documentation. Complete peace of mind.</p>
-      <div className="hero-actions"><Link className="gold-button" href="/contact">Get in touch <ArrowRight size={18}/></Link><Link className="text-button" href="#process">See how it works</Link></div>
+      <div className="hero-actions"><a className="gold-button" href={aryanGoldBuyersLinks.booking}>Get a free valuation <ArrowRight size={18}/></a><a className="text-button" href={aryanGoldBuyersLinks.howItWorks}>See how it works</a></div>
       <div className="trust-strip"><span><CheckCircle2/> Transparent valuation</span><span><CheckCircle2/> Secure transactions</span><span><CheckCircle2/> Professional service</span></div>
     </div><div className="hero-art" aria-hidden="true"><div className="gold-orbit orbit-one"/><div className="gold-orbit orbit-two"/><div className="purity-system">
       {[['750','HALLMARK'],['18K','KARAT'],['916','HALLMARK'],['22K','KARAT'],['999.9','FINE GOLD'],['24K','PURE GOLD']].map(([value,label],index)=><div className={`purity-badge purity-badge-${index+1}`} key={value}><span><b>{value}</b><small>{label}</small></span></div>)}
@@ -43,15 +46,15 @@ export default async function Home() {
     <section id="collection" className="collection-section">
       <div className="collection-intro"><div><p className="eyebrow">Our precious metal range</p><h2>Enduring value.<br/><em>Exceptional craft.</em></h2></div><p>From investment-grade bars and coins to jewellery made to be treasured, explore precious metals selected for purity, beauty, and lasting value.</p></div>
       <div className="collection-grid">
-        <article className="collection-card collection-card-wide"><Image src="/images/metals/gold-bars-coins.webp" alt="Gold bars and investment coins" fill sizes="(max-width: 820px) 100vw, 66vw"/><div className="collection-overlay"><span>Investment essentials</span><h3>Gold bars & coins</h3><Link href="/contact">Enquire now <ArrowRight/></Link></div></article>
-        <article className="collection-card"><Image src="/images/metals/gold-jewellery.webp" alt="Traditional gold jewellery collection" fill sizes="(max-width: 820px) 100vw, 34vw"/><div className="collection-overlay"><span>Crafted to treasure</span><h3>Gold jewellery</h3><Link href="/contact">Explore with us <ArrowRight/></Link></div></article>
-        <article className="collection-card collection-card-silver"><Image src="/images/metals/silver-collection.webp" alt="Silver bars, coins, and jewellery" fill sizes="100vw"/><div className="collection-overlay"><span>Brilliant by nature</span><h3>Silver bars, coins & jewellery</h3><Link href="/contact">Discover silver <ArrowRight/></Link></div></article>
+        <article className="collection-card collection-card-wide"><Image src="/images/metals/gold-bars-coins.webp" alt="Gold bars and investment coins" fill sizes="(max-width: 820px) 100vw, 66vw"/><div className="collection-overlay"><span>Investment essentials</span><h3>Gold bars & coins</h3><a href={aryanGoldBuyersLinks.whatWeBuy}>See what we buy <ArrowRight/></a></div></article>
+        <article className="collection-card"><Image src="/images/metals/gold-jewellery.webp" alt="Traditional gold jewellery collection" fill sizes="(max-width: 820px) 100vw, 34vw"/><div className="collection-overlay"><span>Crafted to treasure</span><h3>Gold jewellery</h3><a href={aryanGoldBuyersLinks.whatWeBuy}>See what we buy <ArrowRight/></a></div></article>
+        <article className="collection-card collection-card-silver"><Image src="/images/metals/silver-collection.webp" alt="Silver bars, coins, and jewellery" fill sizes="100vw"/><div className="collection-overlay"><span>Brilliant by nature</span><h3>Silver bars, coins & jewellery</h3><a href={aryanGoldBuyersLinks.whatWeBuy}>See what we buy <ArrowRight/></a></div></article>
       </div>
     </section>
     <section id="services" className="content-section services-section"><div className="section-heading"><p className="eyebrow">What we do</p><h2>A refined way to trade precious metals.</h2><p>Whether you are buying for value or selling with confidence, every Aryan Gold transaction is careful, clear, and documented.</p></div><div className="service-grid">
-      <article><span><BadgeIndianRupee/></span><h3>Sell precious metals</h3><p>Receive a transparent assessment of your gold or silver based on purity, weight, and the prevailing rate—explained before you decide.</p><Link href="/contact">Request a valuation <ArrowRight/></Link></article>
+      <article><span><BadgeIndianRupee/></span><h3>Sell precious metals</h3><p>Receive a transparent assessment of your gold or silver based on purity, weight, and the prevailing rate—explained before you decide.</p><a href={aryanGoldBuyersLinks.booking}>Request a valuation <ArrowRight/></a></article>
       <article className="featured"><span><Gem/></span><h3>Buy with confidence</h3><p>Choose quality bars, coins, and jewellery with professional documentation and the confidence of a specialist team.</p><Link href="/contact">Enquire now <ArrowRight/></Link></article>
-      <article><span><Scale/></span><h3>Professional valuation</h3><p>Accurate weighing and purity assessment create a fair, auditable foundation for every transaction.</p><Link href="#process">Our process <ArrowRight/></Link></article>
+      <article><span><Scale/></span><h3>Professional valuation</h3><p>Accurate weighing and purity assessment create a fair, auditable foundation for every transaction.</p><a href={aryanGoldBuyersLinks.howItWorks}>Our process <ArrowRight/></a></article>
     </div></section>
     <section id="branches" className="branches-section">
       <div className="branches-heading"><div><p className="eyebrow"><MapPin size={14}/> Our locations</p><h2>Find an Aryan Gold branch near you.</h2></div><p>Visit our specialists in Bengaluru or Chennai for transparent valuation, secure transactions, and personal assistance.</p></div>
@@ -62,7 +65,7 @@ export default async function Home() {
           <a href={mapUrl} target="_blank" rel="noreferrer" aria-label={`View ${branch.branchName} branch on Google Maps`}>View on map <Navigation/></a>
         </article>;
       })}</div>
-      <div className="branches-contact"><span>Need help choosing a location?</span><Link href="/contact">Contact our team <ArrowRight/></Link></div>
+      <div className="branches-contact"><span>Need help choosing a location?</span><a href={aryanGoldBuyersLinks.branches}>Explore all branches <ArrowRight/></a></div>
     </section>
     <section id="process" className="process-section">
       <div className="section-heading light"><p className="eyebrow">Simple by design</p><h2>Clear steps.<br/>Complete confidence.</h2><p>Whether you are selling precious metals or choosing your next purchase, every stage is straightforward, secure, and fully documented.</p></div>
@@ -77,6 +80,6 @@ export default async function Home() {
         <div className="process-image"><Image src="/images/process/buying-gold-selection.webp" alt="Customer choosing gold with guidance from an Aryan Gold specialist" fill sizes="(max-width: 820px) 100vw, 42vw" /></div>
       </div>
     </section>
-    <section id="trust" className="content-section trust-section"><div className="trust-visual"><div className="seal"><ShieldCheck/><span>TRUSTED<br/><b>GOLD</b><br/>TRADING</span></div></div><div><p className="eyebrow">The Aryan standard</p><h2>Trust is our most valuable asset.</h2><p className="lead">Gold carries meaning. That is why our work is grounded in discretion, accuracy, and total transparency—from the first conversation to the final invoice.</p><ul className="check-list"><li><CheckCircle2/> Clear valuation before every transaction</li><li><CheckCircle2/> KYC-led, fully documented process</li><li><CheckCircle2/> Privacy-conscious customer handling</li><li><CheckCircle2/> Responsive, knowledgeable service</li></ul><Link className="gold-button dark" href="/contact">Speak with our team <ArrowRight/></Link></div></section>
+    <section id="trust" className="content-section trust-section"><div className="trust-visual"><div className="seal"><ShieldCheck/><span>TRUSTED<br/><b>GOLD</b><br/>TRADING</span></div></div><div><p className="eyebrow">The Aryan standard</p><h2>Trust is our most valuable asset.</h2><p className="lead">Gold carries meaning. That is why our work is grounded in discretion, accuracy, and total transparency—from the first conversation to the final invoice.</p><ul className="check-list"><li><CheckCircle2/> Clear valuation before every transaction</li><li><CheckCircle2/> KYC-led, fully documented process</li><li><CheckCircle2/> Privacy-conscious customer handling</li><li><CheckCircle2/> Responsive, knowledgeable service</li></ul><a className="gold-button dark" href={aryanGoldBuyersLinks.contact}>Speak with our team <ArrowRight/></a></div></section>
   </>;
 }

@@ -57,6 +57,7 @@ class BankDetailRequestController extends Controller
                 'pending_approval' => (clone $summaryQuery)->where('status', EmployeeBankDetailRequest::STATUS_PENDING)->count(),
                 'approved_waiting' => (clone $summaryQuery)->where('status', EmployeeBankDetailRequest::STATUS_APPROVED)->count(),
                 'pending_verification' => (clone $summaryQuery)->where('status', EmployeeBankDetailRequest::STATUS_SUBMITTED)->count(),
+                'verified' => (clone $summaryQuery)->where('status', EmployeeBankDetailRequest::STATUS_VERIFIED)->count(),
             ],
         ]);
     }
@@ -376,7 +377,10 @@ class BankDetailRequestController extends Controller
     {
         return match ($tab) {
             self::TAB_VERIFICATION => [EmployeeBankDetailRequest::STATUS_SUBMITTED],
-            self::TAB_APPROVED => [EmployeeBankDetailRequest::STATUS_APPROVED],
+            self::TAB_APPROVED => [
+                EmployeeBankDetailRequest::STATUS_APPROVED,
+                EmployeeBankDetailRequest::STATUS_VERIFIED,
+            ],
             default => [EmployeeBankDetailRequest::STATUS_PENDING],
         };
     }

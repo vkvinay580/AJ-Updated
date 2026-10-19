@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Branch;
 use App\Models\Employee;
 use App\Models\TeTrackerVisit;
+use App\Rules\DecodableImage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -98,7 +99,7 @@ class TeTrackerController extends Controller
             'kms' => ['required', 'numeric', 'min:0'],
             'latitude' => ['required', 'numeric'],
             'longitude' => ['required', 'numeric'],
-            'photo' => ['required', 'image', 'max:5120'],
+            'photo' => ['required', 'file', 'max:5120', new DecodableImage],
         ]);
 
         $isBranch = $data['location_type'] === 'branch';
@@ -372,7 +373,7 @@ class TeTrackerController extends Controller
             File::makeDirectory($directory, 0777, true);
         }
 
-        $extension = strtolower($image->getClientOriginalExtension() ?: 'jpg');
+        $extension = DecodableImage::extension($image) ?? 'jpg';
         $safeBranchId = preg_replace('/[^A-Za-z0-9_-]+/', '-', $this->clean($branchId));
         $empId = preg_replace('/[^A-Za-z0-9_-]+/', '-', $this->clean($employee->empId));
         $filename = sprintf(

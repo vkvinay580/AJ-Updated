@@ -9,6 +9,7 @@ use App\Models\Branch;
 use App\Models\Employee;
 use App\Models\EmployeeLocationPing;
 use App\Models\OutsourceLocation;
+use App\Rules\DecodableImage;
 use App\Services\AttendanceClassificationService;
 use App\Services\EmployeeAttendanceBlockService;
 use App\Services\NightShiftTimingService;
@@ -171,7 +172,7 @@ class AttendanceController extends Controller
             'web_view_height' => ['nullable', 'numeric'],
             'web_has_fine_pointer' => ['nullable', 'boolean'],
             'web_has_touch_input' => ['nullable', 'boolean'],
-            'photo' => ['required', 'image', 'max:5120'],
+            'photo' => ['required', 'file', 'max:5120', new DecodableImage],
             'submission_id' => ['nullable', 'uuid'],
         ]);
 
@@ -308,7 +309,7 @@ class AttendanceController extends Controller
             'web_view_height' => ['nullable', 'numeric'],
             'web_has_fine_pointer' => ['nullable', 'boolean'],
             'web_has_touch_input' => ['nullable', 'boolean'],
-            'photo' => ['required', 'image', 'max:5120'],
+            'photo' => ['required', 'file', 'max:5120', new DecodableImage],
             'submission_id' => ['nullable', 'uuid'],
         ]);
 
@@ -462,7 +463,7 @@ class AttendanceController extends Controller
             'source' => ['nullable', 'in:check_in,check_out'],
             'confidence' => ['nullable', 'numeric', 'min:0', 'max:1'],
             'reason' => ['nullable', 'string', 'max:1000'],
-            'photo' => ['required', 'image', 'max:5120'],
+            'photo' => ['required', 'file', 'max:5120', new DecodableImage],
         ]);
 
         $now = Carbon::now($timezone);
@@ -1040,7 +1041,7 @@ class AttendanceController extends Controller
             File::makeDirectory($directory, 0777, true);
         }
 
-        $extension = strtolower($image->getClientOriginalExtension() ?: 'jpg');
+        $extension = DecodableImage::extension($image) ?? 'jpg';
         $safeBranchId = preg_replace(
             '/[^A-Za-z0-9_-]+/',
             '-',
@@ -1072,7 +1073,7 @@ class AttendanceController extends Controller
             File::makeDirectory($directory, 0777, true);
         }
 
-        $extension = strtolower($image->getClientOriginalExtension() ?: 'jpg');
+        $extension = DecodableImage::extension($image) ?? 'jpg';
         $safeBranchId = preg_replace('/[^A-Za-z0-9_-]+/', '-', $this->clean($branchId));
         $empId = preg_replace('/[^A-Za-z0-9_-]+/', '-', trim((string) $employee->empId));
         $filename = sprintf(

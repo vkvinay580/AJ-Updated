@@ -3,9 +3,9 @@
 return [
     'android' => [
         'package_name' => env('APP_UPDATE_ANDROID_PACKAGE_NAME', 'aryan.attendance'),
-        'latest_version' => env('APP_UPDATE_ANDROID_LATEST_VERSION', '5.0.36'),
-        'latest_build_number' => (int) env('APP_UPDATE_ANDROID_LATEST_BUILD', 5037),
-        'minimum_supported_build_number' => (int) env('APP_UPDATE_ANDROID_MIN_SUPPORTED_BUILD', 5037),
+        'latest_version' => env('APP_UPDATE_ANDROID_LATEST_VERSION', '5.0.40'),
+        'latest_build_number' => (int) env('APP_UPDATE_ANDROID_LATEST_BUILD', 5041),
+        'minimum_supported_build_number' => (int) env('APP_UPDATE_ANDROID_MIN_SUPPORTED_BUILD', 5039),
         'force_update' => (bool) env('APP_UPDATE_ANDROID_FORCE', true),
         'download_url' => env(
             'APP_UPDATE_ANDROID_DOWNLOAD_URL',

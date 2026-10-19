@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Employee;
 use App\Models\IdCardSubmission;
+use App\Rules\DecodableImage;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -58,7 +59,7 @@ class EmployeeIdCardController extends Controller
             'phone' => ['required', 'regex:/^[0-9]{10}$/'],
             'emergencyContact' => ['required', 'regex:/^[0-9]{10}$/'],
             'homeAddress' => ['required', 'string', 'max:500'],
-            'photo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'photo' => ['required', 'file', 'max:5120', new DecodableImage],
         ]);
 
         $photoPath = $this->storePhoto($request);
@@ -165,8 +166,15 @@ class EmployeeIdCardController extends Controller
 
     private function storePhoto(Request $request): string
     {
+        $photo = $request->file('photo');
+        $extension = DecodableImage::extension($photo);
+
         try {
-            $path = $request->file('photo')?->store('id-cards/photos', 'public');
+            $path = $photo?->storeAs(
+                'id-cards/photos',
+                bin2hex(random_bytes(20)).'.'.($extension ?? 'jpg'),
+                'public'
+            );
         } catch (Throwable) {
             $path = false;
         }

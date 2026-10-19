@@ -2,13 +2,16 @@ import Footer from "@/components/layout/Footer";
 import Header from "@/components/layout/Header";
 import { CartProvider } from "@/context/CartContext";
 import { RealtimeSync } from "@/components/realtime/RealtimeSync";
+import SiteMotion from "@/components/motion/SiteMotion";
 import type { Metadata } from "next";
+import { ViewTransition } from "react";
 import { Cormorant_Garamond, Manrope } from "next/font/google";
 import { getSiteUrl } from "@/lib/site-url";
 import "./globals.css";
 import "./process.css";
 import "./hero-orbit.css";
 import "./public-theme.css";
+import "./motion.css";
 
 const manrope = Manrope({
   variable: "--font-manrope",
@@ -72,10 +75,13 @@ export default function RootLayout({
       <body
         className={`${manrope.variable} ${cormorant.variable} antialiased flex flex-col min-h-screen`}
       >
+        <SiteMotion />
         <RealtimeSync />
         <CartProvider>
           <Header />
-          <main className="flex-grow">{children}</main>
+          <ViewTransition name="route-content" update="route-swap" default="none">
+            <main className="flex-grow">{children}</main>
+          </ViewTransition>
           <Footer />
         </CartProvider>
       </body>

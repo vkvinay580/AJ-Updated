@@ -8,6 +8,7 @@ A responsive gold-trading website and private, multi-company administration syst
 - Company-specific login at `/admin/login`.
 - Customer phone lookup: an existing number goes directly to billing; a new number starts registration.
 - Aadhaar and/or PAN KYC with encrypted identification numbers and protected uploads.
+- Optional customer working proof with company name, address, designation, a camera-captured or uploaded company ID card, and an old-gold wearing image.
 - Upload or live webcam capture for KYC documents and an optional customer photograph.
 - Gold sale and purchase bills with multiple items, purity, weight, rate, tax, adjustment, and payment method.
 - Company-isolated customer, KYC, and bill search.
@@ -47,9 +48,9 @@ ATTENDANCE_API_URL=https://attendance.aryangold.in/api
 BRANCH_PORTAL_URL=https://biz.aryangold.in
 ```
 
-`NEXT_PUBLIC_SITE_URL` drives canonical metadata, the sitemap, robots file, and origin validation. Create DNS and TLS for the attendance and branch subdomains before publishing the Android apps. The Attendance production database and Laravel settings are documented in `Attendance app/Backend/.env.production.example`; keep real credentials only in the hosting environment.
+`NEXT_PUBLIC_SITE_URL` drives canonical metadata, the sitemap, robots file, and primary-site origin validation. `BRANCH_PORTAL_URL` is also included in the same-origin allowlist so browser POST requests from the mapped branch subdomain pass CSRF protection behind cPanel's reverse proxy. Both values must be HTTPS origins without paths or credentials. Create DNS and TLS for the attendance and branch subdomains before publishing the Android apps. The Attendance production database and Laravel settings are documented in `Attendance app/Backend/.env.production.example`; keep real credentials only in the hosting environment.
 
-Back up the database, `storage/kyc`, `storage/pledges`, and `storage/chat` together. Private documents and chat attachments are never placed in the public directory.
+Back up the database, `storage/kyc`, `storage/pledges`, and `storage/chat` together. Customer KYC files, company ID cards, and old-gold wearing images are stored under `storage/kyc`; private documents and chat attachments are never placed in the public directory.
 
 ## Team chat
 
@@ -64,7 +65,7 @@ The MySQL/MariaDB schema is stored in [database/schema.sql](./database/schema.sq
 - `companies` and `admin_company_access`
 - `admins` and expiring `sessions`
 - `chat_users` and `chat_messages` (cross-role directory, private conversations, unread/read state, and protected attachment metadata)
-- `customers` (phone unique inside each company)
+- `customers` (phone unique inside each company, optional employment details, private company ID card metadata, and old-gold wearing-image metadata)
 - `kyc_records` (encrypted number, search hash, masked last four, private file path)
 - `bills`, `bill_items`, and `invoice_sequences` (concurrency-safe company-specific bill numbers)
 - `audit_logs`

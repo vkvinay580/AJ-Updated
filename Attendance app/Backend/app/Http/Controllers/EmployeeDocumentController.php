@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Employee;
 use App\Models\EmployeeDocument;
+use App\Services\GeneratedEmployeeDocumentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -13,12 +14,16 @@ use Illuminate\View\View;
 
 class EmployeeDocumentController extends Controller
 {
+    public function __construct(
+        private readonly GeneratedEmployeeDocumentService $generatedDocuments
+    ) {}
+
     public function index(Request $request): JsonResponse
     {
         $employee = $request->user();
         abort_unless($employee instanceof Employee, 401);
 
-        $documents = EmployeeDocument::query()
+        $uploadedDocuments = EmployeeDocument::query()
             ->where('employee_id', $employee->getKey())
             ->latest('created_at')
             ->get()
@@ -38,7 +43,33 @@ class EmployeeDocumentController extends Controller
             ])
             ->values();
 
+        $documents = collect($this->generatedDocuments->availableFor($employee))
+            ->concat($uploadedDocuments)
+            ->map(function (array $document): array {
+                unset($document['generatedType']);
+
+                return $document;
+            })
+            ->values();
+
         return response()->json(['documents' => $documents]);
+    }
+
+    public function downloadGenerated(Request $request, Employee $employee, string $type)
+    {
+        $period = trim((string) $request->query('period')) ?: null;
+        if ($period !== null) {
+            abort_unless(preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $period) === 1, 404);
+        }
+
+        $document = $this->generatedDocuments->render($employee, $type, $period);
+
+        return response($document['content'], 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$document['fileName'].'"',
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     public function download(Employee $employee, EmployeeDocument $document)

@@ -23,13 +23,13 @@ return new class extends Migration
 
         $latestEmployeeDetails = collect();
 
-        if (Schema::hasTable('employeeDetails')) {
-            $latestEmployeeDetails = DB::table('employeeDetails')
+        if (Schema::hasTable('employeedetails')) {
+            $latestEmployeeDetails = DB::table('employeedetails')
                 ->select('employeeId', 'uanNumber')
                 ->whereIn('id', function ($query): void {
                     $query
                         ->selectRaw('MAX(id)')
-                        ->from('employeeDetails')
+                        ->from('employeedetails')
                         ->groupBy('employeeId');
                 })
                 ->get()

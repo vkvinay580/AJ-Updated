@@ -23,9 +23,9 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 76px;
-  height: 76px;
-  margin: -38px;
+  width: 78px;
+  height: 78px;
+  margin: -39px;
   transform: rotate(var(--angle)) translateY(calc(-1 * var(--orbit-radius))) rotate(calc(-1 * var(--angle)));
 }
 
@@ -54,7 +54,7 @@
 .purity-badge b {
   position: relative;
   font-family: var(--font-serif);
-  font-size: calc(20px + 4px);
+  font-size: calc(20px + 2px);
   line-height: 1;
   letter-spacing: .02em;
 }
@@ -62,7 +62,7 @@
 .purity-badge small {
   position: relative;
   margin-top: 5px;
-  font-size: calc(6px + 4px);
+  font-size: calc(6px + 2px);
   font-weight: 900;
   letter-spacing: .17em;
 }
@@ -90,9 +90,9 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 74px;
-  height: 74px;
-  margin: -37px;
+  width: 76px;
+  height: 76px;
+  margin: -38px;
 }
 
 .service-electron-buy {
@@ -132,13 +132,13 @@
 
 .service-electron b {
   font-family: var(--font-serif);
-  font-size: calc(17px + 4px);
+  font-size: calc(17px + 2px);
   letter-spacing: .06em;
 }
 
 .service-electron small {
   margin-top: 4px;
-  font-size: calc(5px + 4px);
+  font-size: calc(5px + 2px);
   font-weight: 900;
   letter-spacing: .1em;
 }
@@ -181,13 +181,13 @@
   }
 
   .purity-badge {
-    width: 64px;
-    height: 64px;
-    margin: -32px;
+    width: 66px;
+    height: 66px;
+    margin: -33px;
   }
 
-  .purity-badge b { font-size: calc(17px + 4px); }
-  .purity-badge small { font-size: calc(5px + 4px); }
+  .purity-badge b { font-size: calc(17px + 2px); }
+  .purity-badge small { font-size: calc(5px + 2px); }
 
   .service-electrons {
     --service-radius: 150px;
@@ -196,13 +196,13 @@
   }
 
   .service-electron {
-    width: 62px;
-    height: 62px;
-    margin: -31px;
+    width: 64px;
+    height: 64px;
+    margin: -32px;
   }
 
-  .service-electron b { font-size: calc(14px + 4px); }
-  .service-electron small { font-size: calc(4px + 4px); }
+  .service-electron b { font-size: calc(14px + 2px); }
+  .service-electron small { font-size: calc(4px + 2px); }
 }
 
 @media (max-width: 560px) {
@@ -213,14 +213,14 @@
   }
 
   .purity-badge {
-    width: 52px;
-    height: 52px;
-    margin: -26px;
+    width: 54px;
+    height: 54px;
+    margin: -27px;
   }
 
   .purity-badge > span::before { inset: 4px; }
-  .purity-badge b { font-size: calc(14px + 4px); }
-  .purity-badge small { margin-top: 3px; font-size: calc(4px + 4px); }
+  .purity-badge b { font-size: calc(14px + 2px); }
+  .purity-badge small { margin-top: 3px; font-size: calc(4px + 2px); }
 
   .service-electrons {
     --service-radius: 118px;
@@ -229,12 +229,12 @@
   }
 
   .service-electron {
-    width: 52px;
-    height: 52px;
-    margin: -26px;
+    width: 54px;
+    height: 54px;
+    margin: -27px;
   }
 
-  .service-electron b { font-size: calc(12px + 4px); }
+  .service-electron b { font-size: calc(12px + 2px); }
   .service-electron small { display: none; }
 }
 

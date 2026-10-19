@@ -3,7 +3,6 @@
 namespace App\Support;
 
 use Illuminate\Support\Carbon;
-use RuntimeException;
 
 class MayPfEligibility
 {
@@ -145,10 +144,15 @@ class MayPfEligibility
             return self::$employees;
         }
 
-        $contents = file_get_contents(self::dataPath());
+        $path = self::dataPath();
+        if (! is_file($path) || ! is_readable($path)) {
+            return self::$employees = self::emptyData();
+        }
+
+        $contents = @file_get_contents($path);
 
         if ($contents === false) {
-            throw new RuntimeException('Unable to read the PF employee allowlist effective from May 2026.');
+            return self::$employees = self::emptyData();
         }
 
         $data = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
@@ -158,6 +162,14 @@ class MayPfEligibility
                 ? (float) $data['defaultPfAmount']
                 : 0.0,
             'employees' => is_array($data['employees'] ?? null) ? $data['employees'] : [],
+        ];
+    }
+
+    private static function emptyData(): array
+    {
+        return [
+            'defaultPfAmount' => 0.0,
+            'employees' => [],
         ];
     }
 

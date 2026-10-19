@@ -31,8 +31,204 @@
 
   <title>Aryan Gold Attendance</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #032e2a;
+    }
+
+    #aryan-boot-splash {
+      position: fixed;
+      inset: 0;
+      z-index: 999999;
+      display: grid;
+      place-items: center;
+      min-width: 100vw;
+      min-height: 100vh;
+      min-height: 100dvh;
+      overflow: hidden;
+      color: #fff;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 88% 10%, rgba(245, 194, 27, .22), transparent 30%),
+        radial-gradient(circle at 7% 92%, rgba(161, 30, 30, .25), transparent 35%),
+        linear-gradient(135deg, #021f1d 0%, #064d47 58%, #006a64 100%);
+      transition: opacity .42s ease, visibility .42s ease;
+    }
+
+    #aryan-boot-splash::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      opacity: .18;
+      background-image:
+        linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px);
+      background-size: 58px 58px;
+      mask-image: radial-gradient(circle at center, #000 5%, transparent 68%);
+    }
+
+    #aryan-boot-splash.is-ready {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .aryan-boot-content {
+      position: relative;
+      z-index: 1;
+      width: min(520px, calc(100vw - 48px));
+      display: grid;
+      justify-items: center;
+      gap: 22px;
+      text-align: center;
+    }
+
+    .aryan-boot-kicker {
+      padding: 8px 14px;
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 999px;
+      background: rgba(255,255,255,.07);
+      color: #ebcb6b;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 1.7px;
+    }
+
+    .aryan-boot-mark {
+      position: relative;
+      width: clamp(190px, 25vw, 270px);
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+    }
+
+    .aryan-boot-mark::before,
+    .aryan-boot-mark::after {
+      content: "";
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid rgba(235, 203, 107, .55);
+      animation: aryan-spin 2.8s linear infinite;
+    }
+
+    .aryan-boot-mark::before {
+      inset: -24px;
+      border-left-color: transparent;
+      border-bottom-color: rgba(235, 203, 107, .16);
+    }
+
+    .aryan-boot-mark::after {
+      inset: -43px;
+      border-right-color: transparent;
+      border-top-color: rgba(235, 203, 107, .14);
+      animation-direction: reverse;
+      animation-duration: 4.2s;
+    }
+
+    .aryan-boot-logo-shell {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      place-items: center;
+      box-sizing: border-box;
+      padding: 18px;
+      border: 2px solid #ebcb6b;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #fff, #fff7e3);
+      box-shadow: 0 28px 70px rgba(0, 18, 16, .45), 0 0 36px rgba(245, 194, 27, .18);
+      animation: aryan-arrive .72s cubic-bezier(.2,.9,.25,1.16) both;
+    }
+
+    .aryan-boot-logo-shell img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .aryan-boot-title {
+      margin-top: 10px;
+      font-size: clamp(18px, 2.7vw, 26px);
+      font-weight: 850;
+      letter-spacing: clamp(3px, .55vw, 5px);
+    }
+
+    .aryan-boot-subtitle {
+      margin-top: -14px;
+      color: rgba(255,255,255,.72);
+      font-size: 13px;
+      font-weight: 650;
+      letter-spacing: .4px;
+    }
+
+    .aryan-boot-progress {
+      width: min(360px, 76vw);
+      height: 4px;
+      margin-top: 10px;
+      overflow: hidden;
+      border-radius: 99px;
+      background: rgba(255,255,255,.12);
+    }
+
+    .aryan-boot-progress span {
+      display: block;
+      width: 42%;
+      height: 100%;
+      border-radius: inherit;
+      background: #ebcb6b;
+      animation: aryan-progress 1.25s ease-in-out infinite;
+    }
+
+    .aryan-boot-status {
+      margin-top: -12px;
+      color: rgba(255,255,255,.74);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .4px;
+    }
+
+    @keyframes aryan-spin { to { transform: rotate(360deg); } }
+    @keyframes aryan-arrive {
+      from { opacity: 0; transform: scale(.78); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    @keyframes aryan-progress {
+      from { transform: translateX(-120%); }
+      to { transform: translateX(340%); }
+    }
+
+    @media (max-height: 620px) {
+      .aryan-boot-content { gap: 12px; }
+      .aryan-boot-mark { width: 150px; }
+      .aryan-boot-title { margin-top: 4px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .aryan-boot-mark::before,
+      .aryan-boot-mark::after,
+      .aryan-boot-logo-shell,
+      .aryan-boot-progress span { animation: none; }
+    }
+  </style>
 </head>
 <body>
+  <div id="aryan-boot-splash" role="status" aria-label="Loading Aryan Gold Attendance">
+    <div class="aryan-boot-content">
+      <div class="aryan-boot-kicker">ARYAN GOLD &nbsp;•&nbsp; PEOPLE &amp; OPERATIONS</div>
+      <div class="aryan-boot-mark">
+        <div class="aryan-boot-logo-shell">
+          <img src="assets/assets/images/aryan_gold_logo.png" alt="Aryan Gold">
+        </div>
+      </div>
+      <div class="aryan-boot-title">ARYAN GOLD ATTENDANCE</div>
+      <div class="aryan-boot-subtitle">Your workday. Connected.</div>
+      <div class="aryan-boot-progress"><span></span></div>
+      <div class="aryan-boot-status">Preparing your secure workspace</div>
+    </div>
+  </div>
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader
@@ -42,5 +238,17 @@
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
   <script src="flutter_bootstrap.js" async></script>
+  <script>
+    (() => {
+      const splash = document.getElementById('aryan-boot-splash');
+      if (!splash) return;
+      const removeSplash = () => {
+        splash.classList.add('is-ready');
+        window.setTimeout(() => splash.remove(), 480);
+      };
+      window.addEventListener('flutter-first-frame', removeSplash, { once: true });
+      window.addEventListener('load', () => window.setTimeout(removeSplash, 10000), { once: true });
+    })();
+  </script>
 </body>
 </html>

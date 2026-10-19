@@ -14,10 +14,24 @@ export function cleanText(value: unknown, max = 200) {
   return String(value || "").trim().replace(/[<>]/g, "").slice(0, max);
 }
 
+function configuredOrigin(value: string | undefined) {
+  if (!value?.trim()) return null;
+
+  try {
+    const url = new URL(value);
+    if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) return null;
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
 export function sameOrigin(request: NextRequest) {
   const origin = request.headers.get("origin");
   if (!origin) return true;
   const allowedOrigins = new Set([request.nextUrl.origin, getSiteUrl()]);
+  const branchPortalOrigin = configuredOrigin(process.env.BRANCH_PORTAL_URL);
+  if (branchPortalOrigin) allowedOrigins.add(branchPortalOrigin);
 
   const forwardedHost = request.headers.get("x-forwarded-host");
   const forwardedProto = request.headers.get("x-forwarded-proto");

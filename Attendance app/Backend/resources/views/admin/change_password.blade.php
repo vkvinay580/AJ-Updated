@@ -39,9 +39,15 @@
                             @endif
 
                             <div class="mb-3">
-                                <label for="formName" class="form-label">Old Password</label>
-                                <input class="form-control" type="password" name="old_password"
-                                    placeholder="Enter Old Password" aria-label="default input example">
+                                <label for="old_password" class="form-label">Old Password</label>
+                                <div class="input-group">
+                                    <input class="form-control" id="old_password" type="password" name="old_password"
+                                        placeholder="Enter Old Password" autocomplete="current-password" required>
+                                    <button class="btn btn-outline-secondary password-visibility-toggle" type="button"
+                                        data-password-target="old_password" aria-label="Show old password" aria-pressed="false">
+                                        <i class="bx bx-show" aria-hidden="true"></i>
+                                    </button>
+                                </div>
                                 @error('old_password')
                                     <span class="text-danger">{{ $message }}</span>
                                 @enderror
@@ -49,9 +55,15 @@
 
 
                             <div class="mb-3">
-                                <label for="formName" class="form-label">New Password</label>
-                                <input class="form-control" type="password" name="new_password"
-                                    placeholder="Enter New Password" aria-label="default input example">
+                                <label for="new_password" class="form-label">New Password</label>
+                                <div class="input-group">
+                                    <input class="form-control" id="new_password" type="password" name="new_password"
+                                        placeholder="Enter New Password" autocomplete="new-password" required>
+                                    <button class="btn btn-outline-secondary password-visibility-toggle" type="button"
+                                        data-password-target="new_password" aria-label="Show new password" aria-pressed="false">
+                                        <i class="bx bx-show" aria-hidden="true"></i>
+                                    </button>
+                                </div>
                                 @error('new_password')
                                     <span class="text-danger">{{ $message }}</span>
                                 @enderror
@@ -59,9 +71,17 @@
 
 
                             <div class="mb-3">
-                                <label for="formName" class="form-label">Confirm Password</label>
-                                <input class="form-control" type="password" name="new_password_confirmation"
-                                    placeholder="Enter New Confirmation Password" aria-label="default input example">
+                                <label for="new_password_confirmation" class="form-label">Confirm Password</label>
+                                <div class="input-group">
+                                    <input class="form-control" id="new_password_confirmation" type="password"
+                                        name="new_password_confirmation" placeholder="Confirm New Password"
+                                        autocomplete="new-password" required>
+                                    <button class="btn btn-outline-secondary password-visibility-toggle" type="button"
+                                        data-password-target="new_password_confirmation"
+                                        aria-label="Show confirmation password" aria-pressed="false">
+                                        <i class="bx bx-show" aria-hidden="true"></i>
+                                    </button>
+                                </div>
                                 @error('new_password_confirmation')
                                     <span class="text-danger">{{ $message }}</span>
                                 @enderror
@@ -79,4 +99,27 @@
         </div>
         <!--end row-->
     </div>
+
+    <script>
+        document.querySelectorAll('.password-visibility-toggle').forEach(function (button) {
+            button.addEventListener('click', function () {
+                var input = document.getElementById(button.dataset.passwordTarget);
+
+                if (!input) {
+                    return;
+                }
+
+                var shouldShow = input.type === 'password';
+                input.type = shouldShow ? 'text' : 'password';
+                button.setAttribute('aria-pressed', shouldShow ? 'true' : 'false');
+                button.setAttribute('aria-label', (shouldShow ? 'Hide ' : 'Show ') + input.labels[0].textContent.toLowerCase());
+
+                var icon = button.querySelector('i');
+                if (icon) {
+                    icon.classList.toggle('bx-show', !shouldShow);
+                    icon.classList.toggle('bx-hide', shouldShow);
+                }
+            });
+        });
+    </script>
 @endsection

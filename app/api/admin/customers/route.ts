@@ -1,34 +1,9 @@
-import { randomBytes } from "node:crypto";
-import { mkdirSync, unlinkSync, writeFileSync } from "node:fs";
-import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 import type { RowDataPacket } from "mysql2";
 import { apiError, cleanPhone, cleanText, requestIp } from "@/lib/api";
 import { businessAuthenticated } from "@/lib/business-actor";
+import { removeCustomerFile, storeCustomerFile } from "@/lib/customer-files";
 import { encryptSensitive, execute, one, rows, stableHash, transaction } from "@/lib/db";
-
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
-const uploadRoot = path.join(process.cwd(), "storage", "kyc");
-
-function fileKind(bytes: Uint8Array) {
-  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return { ext: "jpg", mime: "image/jpeg" };
-  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return { ext: "png", mime: "image/png" };
-  if (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) return { ext: "pdf", mime: "application/pdf" };
-  if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 && String.fromCharCode(...bytes.slice(8, 12)) === "WEBP") return { ext: "webp", mime: "image/webp" };
-  return null;
-}
-
-async function storeFile(file: File, companyId: number) {
-  if (file.size > MAX_FILE_SIZE) throw new Error("Each document must be 5 MB or smaller.");
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const kind = fileKind(bytes);
-  if (!kind) throw new Error("Only JPG, PNG, WebP and PDF documents are accepted.");
-  const companyFolder = path.join(uploadRoot, String(companyId));
-  mkdirSync(companyFolder, { recursive: true });
-  const relative = `${companyId}/${randomBytes(20).toString("hex")}.${kind.ext}`;
-  writeFileSync(path.join(uploadRoot, relative), bytes, { flag: "wx" });
-  return { path: relative.replace(/\\/g, "/"), mime: kind.mime };
-}
 
 export async function GET(request: NextRequest) {
   const { error, actor: session } = await businessAuthenticated(request);
@@ -66,6 +41,9 @@ export async function POST(request: NextRequest) {
   const postalCode = cleanText(form.get("postalCode"), 10);
   const aadhaar = String(form.get("aadhaar") || "").replace(/\D/g, "");
   const pan = String(form.get("pan") || "").trim().toUpperCase();
+  const employerName = cleanText(form.get("employerName"), 190);
+  const employerAddress = cleanText(form.get("employerAddress"), 500);
+  const employmentDesignation = cleanText(form.get("employmentDesignation"), 120);
   if (phone.length !== 10) return apiError("Enter a valid 10-digit phone number.");
   if (name.length < 2) return apiError("Customer name is required.");
   if (!/^\d{12}$/.test(aadhaar) && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)) return apiError("A valid Aadhaar or PAN is required.");
@@ -81,18 +59,32 @@ export async function POST(request: NextRequest) {
     const customerImage = form.get("customerImage");
     const aadhaarFile = form.get("aadhaarFile");
     const panFile = form.get("panFile");
-    const storedCustomer = customerImage instanceof File && customerImage.size ? await storeFile(customerImage, session.companyId) : null;
+    const companyIdCard = form.get("companyIdCard");
+    const oldGoldWearingImage = form.get("oldGoldWearingImage");
+    const storedCustomer = customerImage instanceof File && customerImage.size ? await storeCustomerFile(customerImage, session.companyId) : null;
     if (storedCustomer) savedFiles.push(storedCustomer.path);
-    const storedAadhaar = aadhaarFile instanceof File && aadhaarFile.size ? await storeFile(aadhaarFile, session.companyId) : null;
+    const storedAadhaar = aadhaarFile instanceof File && aadhaarFile.size ? await storeCustomerFile(aadhaarFile, session.companyId) : null;
     if (storedAadhaar) savedFiles.push(storedAadhaar.path);
-    const storedPan = panFile instanceof File && panFile.size ? await storeFile(panFile, session.companyId) : null;
+    const storedPan = panFile instanceof File && panFile.size ? await storeCustomerFile(panFile, session.companyId) : null;
     if (storedPan) savedFiles.push(storedPan.path);
+    const storedCompanyId = companyIdCard instanceof File && companyIdCard.size ? await storeCustomerFile(companyIdCard, session.companyId, false) : null;
+    if (storedCompanyId) savedFiles.push(storedCompanyId.path);
+    const storedOldGoldWearingImage = oldGoldWearingImage instanceof File && oldGoldWearingImage.size ? await storeCustomerFile(oldGoldWearingImage, session.companyId, false) : null;
+    if (storedOldGoldWearingImage) savedFiles.push(storedOldGoldWearingImage.path);
 
     const customerId = await transaction(async (connection) => {
       const result = await execute(`INSERT INTO customers
-        (company_id, phone, name, email, address, city, state, gstin, state_code, place_of_supply, postal_code, customer_image_path, origin_branch_id, created_by_employee_id, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [session.companyId, phone, name, email || null, address || null, city || null, state || null, gstin || null, stateCode || null, placeOfSupply || state || null, postalCode || null, storedCustomer?.path || null, session.branchId, session.employeeId, session.adminId], connection);
+        (company_id, phone, name, email, address, city, state, gstin, state_code, place_of_supply, postal_code, customer_image_path,
+          employer_name, employer_address, employment_designation, company_id_card_path, company_id_card_original_name, company_id_card_mime_type,
+          old_gold_wearing_image_path, old_gold_wearing_image_original_name, old_gold_wearing_image_mime_type,
+          origin_branch_id, created_by_employee_id, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [session.companyId, phone, name, email || null, address || null, city || null, state || null, gstin || null, stateCode || null, placeOfSupply || state || null, postalCode || null, storedCustomer?.path || null,
+          employerName || null, employerAddress || null, employmentDesignation || null, storedCompanyId?.path || null,
+          companyIdCard instanceof File && companyIdCard.size ? cleanText(companyIdCard.name, 255) : null, storedCompanyId?.mime || null,
+          storedOldGoldWearingImage?.path || null,
+          oldGoldWearingImage instanceof File && oldGoldWearingImage.size ? cleanText(oldGoldWearingImage.name, 255) : null, storedOldGoldWearingImage?.mime || null,
+          session.branchId, session.employeeId, session.adminId], connection);
       const newCustomerId = result.insertId;
       if (session.branchId && session.employeeId) await execute(`INSERT INTO branch_customers
         (branch_id,name,phone,address,created_by_employee_id) VALUES (?,?,?,?,?)
@@ -108,7 +100,7 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ customerId }, { status: 201 });
   } catch (caught) {
-    for (const file of savedFiles) { try { unlinkSync(path.join(uploadRoot, file)); } catch {} }
+    for (const file of savedFiles) removeCustomerFile(file);
     const message = caught instanceof Error ? caught.message : "Unable to create customer.";
     if (message.includes("Duplicate entry")) return apiError("This phone, Aadhaar, or PAN is already registered in this company.", 409);
     return apiError(message, 500);

@@ -8,8 +8,8 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasTable('employeeDetails') && ! Schema::hasColumn('employeeDetails', 'uanNumber')) {
-            Schema::table('employeeDetails', function (Blueprint $table): void {
+        if (Schema::hasTable('employeedetails') && ! Schema::hasColumn('employeedetails', 'uanNumber')) {
+            Schema::table('employeedetails', function (Blueprint $table): void {
                 $table->string('uanNumber', 30)->default('');
             });
         }
@@ -29,8 +29,8 @@ return new class extends Migration
             });
         }
 
-        if (Schema::hasTable('employeeDetails') && Schema::hasColumn('employeeDetails', 'uanNumber')) {
-            Schema::table('employeeDetails', function (Blueprint $table): void {
+        if (Schema::hasTable('employeedetails') && Schema::hasColumn('employeedetails', 'uanNumber')) {
+            Schema::table('employeedetails', function (Blueprint $table): void {
                 $table->dropColumn('uanNumber');
             });
         }

@@ -1,15 +1,15 @@
 <?php
 
-use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\AppUpdateController;
+use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\BusinessIntegrationController;
 use App\Http\Controllers\EmployeeAuthController;
 use App\Http\Controllers\EmployeeBranchOpeningController;
 use App\Http\Controllers\EmployeeDocumentController;
+use App\Http\Controllers\EmployeeIdCardController;
 use App\Http\Controllers\EmployeeNotificationController;
 use App\Http\Controllers\EmployeeRequestController;
-use App\Http\Controllers\EmployeeIdCardController;
 use App\Http\Controllers\TeTrackerController;
-use App\Http\Controllers\BusinessIntegrationController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -42,6 +42,9 @@ Route::get('/employee/id-card/photo/{submission}', [EmployeeIdCardController::cl
 Route::get('/employee/documents/{employee}/{document}/download', [EmployeeDocumentController::class, 'download'])
     ->middleware('signed:relative')
     ->name('employee.documents.download');
+Route::get('/employee/generated-documents/{employee}/{type}/download', [EmployeeDocumentController::class, 'downloadGenerated'])
+    ->middleware('signed:relative')
+    ->name('employee.generated-documents.download');
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/employee/profile', [EmployeeAuthController::class, 'profile']);

@@ -8,11 +8,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasTable('employeeDetails')) {
+        if (Schema::hasTable('employeedetails')) {
             return;
         }
 
-        Schema::create('employeeDetails', function (Blueprint $table): void {
+        Schema::create('employeedetails', function (Blueprint $table): void {
             $table->increments('id');
             $table->string('empName', 150);
             $table->string('employeeId', 50)->index();

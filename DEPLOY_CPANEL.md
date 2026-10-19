@@ -35,6 +35,8 @@ Use the Node.js application's environment-variable interface. Copy the names fro
 - `ATTENDANCE_INTEGRATION_KEY` = a long random secret shared only with the Attendance backend
 - `BRANCH_PORTAL_URL` = `https://biz.aryangold.in`
 
+`NEXT_PUBLIC_SITE_URL` and `BRANCH_PORTAL_URL` are trusted browser origins for API CSRF checks. Enter origins only—HTTPS scheme and hostname, with no page path, username, password, or trailing application route—and restart the Node.js application after changing either value.
+
 Keep `DATA_ENCRYPTION_KEY` permanently backed up. Changing or losing it makes stored Aadhaar/PAN values unreadable.
 
 ## 3. Install, initialize, and build
@@ -81,7 +83,7 @@ Enable **AutoSSL** for the domain before accepting real KYC documents. Camera ca
 
 ## Persistent files and backups
 
-KYC uploads are stored under `storage/kyc`, branch pledge bills under `storage/pledges`, and private chat attachments under `storage/chat`. Keep these folders writable by the Node.js application and back them up together with the MySQL database. Never move them under `public`; documents are served only through authenticated routes.
+KYC uploads, customer company ID cards, and old-gold wearing images are stored under `storage/kyc`, branch pledge bills under `storage/pledges`, and private chat attachments under `storage/chat`. Keep these folders writable by the Node.js application and back them up together with the MySQL database. Never move them under `public`; documents are served only through authenticated routes.
 
 Recommended permissions are `750` for `storage` and its subdirectories, subject to the hosting provider's ownership configuration.
 

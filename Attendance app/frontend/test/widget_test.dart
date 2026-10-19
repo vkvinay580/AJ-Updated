@@ -5,9 +5,10 @@ import 'package:frontend/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  testWidgets('constrains the complete web app viewport on wide screens', (
+  testWidgets('uses the full web viewport for the launch splash', (
     WidgetTester tester,
   ) async {
+    SharedPreferences.setMockInitialValues({});
     tester.view.physicalSize = const Size(1920, 1080);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -15,9 +16,12 @@ void main() {
 
     await tester.pumpWidget(const EmployeePortalApp());
 
-    final scaffoldRect = tester.getRect(find.byType(Scaffold).first);
-    expect(scaffoldRect.width, lessThanOrEqualTo(1200));
-    expect(scaffoldRect.center.dx, closeTo(960, 0.1));
+    final splashRect = tester.getRect(find.byType(Scaffold).first);
+    expect(splashRect, const Rect.fromLTWH(0, 0, 1920, 1080));
+    expect(find.text('ARYAN GOLD ATTENDANCE'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
   });
 
   testWidgets('shows employee login screen', (WidgetTester tester) async {

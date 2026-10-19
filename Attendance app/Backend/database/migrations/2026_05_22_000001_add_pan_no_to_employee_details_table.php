@@ -8,22 +8,22 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (! Schema::hasTable('employeeDetails') || Schema::hasColumn('employeeDetails', 'panNo')) {
+        if (! Schema::hasTable('employeedetails') || Schema::hasColumn('employeedetails', 'panNo')) {
             return;
         }
 
-        Schema::table('employeeDetails', function (Blueprint $table): void {
+        Schema::table('employeedetails', function (Blueprint $table): void {
             $table->string('panNo', 20)->default('')->after('aadhaarNo');
         });
     }
 
     public function down(): void
     {
-        if (! Schema::hasTable('employeeDetails') || ! Schema::hasColumn('employeeDetails', 'panNo')) {
+        if (! Schema::hasTable('employeedetails') || ! Schema::hasColumn('employeedetails', 'panNo')) {
             return;
         }
 
-        Schema::table('employeeDetails', function (Blueprint $table): void {
+        Schema::table('employeedetails', function (Blueprint $table): void {
             $table->dropColumn('panNo');
         });
     }

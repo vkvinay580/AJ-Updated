@@ -95,6 +95,23 @@ try {
   }
   await connection.query("UPDATE bill_items SET hsn_code='711319' WHERE hsn_code='710319'");
 
+  const customerWorkingProofColumns = [
+    ["employer_name", "VARCHAR(190) NULL AFTER customer_image_path"],
+    ["employer_address", "VARCHAR(500) NULL AFTER employer_name"],
+    ["employment_designation", "VARCHAR(120) NULL AFTER employer_address"],
+    ["company_id_card_path", "VARCHAR(255) NULL AFTER employment_designation"],
+    ["company_id_card_original_name", "VARCHAR(255) NULL AFTER company_id_card_path"],
+    ["company_id_card_mime_type", "VARCHAR(100) NULL AFTER company_id_card_original_name"],
+    ["old_gold_wearing_image_path", "VARCHAR(255) NULL AFTER company_id_card_mime_type"],
+    ["old_gold_wearing_image_original_name", "VARCHAR(255) NULL AFTER old_gold_wearing_image_path"],
+    ["old_gold_wearing_image_mime_type", "VARCHAR(100) NULL AFTER old_gold_wearing_image_original_name"],
+  ];
+  const [existingCustomerColumns] = await connection.query("SHOW COLUMNS FROM customers");
+  const existingCustomerColumnNames = new Set(existingCustomerColumns.map((column) => column.Field));
+  for (const [name, definition] of customerWorkingProofColumns) {
+    if (!existingCustomerColumnNames.has(name)) await connection.query(`ALTER TABLE customers ADD COLUMN ${name} ${definition}`);
+  }
+
   const [existingTransactionColumns] = await connection.query("SHOW COLUMNS FROM branch_transactions");
   const transactionColumnNames = new Set(existingTransactionColumns.map((column) => column.Field));
   const transactionColumns = [

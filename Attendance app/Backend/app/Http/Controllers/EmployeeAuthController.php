@@ -10,6 +10,7 @@ use App\Models\EmployeeAppCredential;
 use App\Models\EmployeeBankDetailRequest;
 use App\Models\EmployeeDetail;
 use App\Models\OutsourceLocation;
+use App\Rules\DecodableImage;
 use App\Services\EmployeeBranchOpeningService;
 use App\Support\MayPfEligibility;
 use App\Support\ShiftTimingFormatter;
@@ -194,7 +195,7 @@ class EmployeeAuthController extends Controller
             if ($hasAadhaarInput) {
                 $detail->aadhaarNo = $this->clean($data['aadhaarNumber'] ?? null);
             }
-            if ($hasPanInput && Schema::hasColumn('employeeDetails', 'panNo')) {
+            if ($hasPanInput && Schema::hasColumn('employeedetails', 'panNo')) {
                 $detail->panNo = strtoupper($this->clean($data['panNumber'] ?? null));
             }
             $detail->save();
@@ -322,7 +323,7 @@ class EmployeeAuthController extends Controller
         abort_unless($employee instanceof Employee, 401);
 
         $request->validate([
-            'photo' => ['required', 'image', 'max:5120'],
+            'photo' => ['required', 'file', 'max:5120', new DecodableImage],
         ]);
 
         $employee->photo = $this->storeEmployeePhoto(
@@ -390,7 +391,7 @@ class EmployeeAuthController extends Controller
             'gender' => $this->clean($employee->gender),
             'maritalStatus' => $this->clean($employee->marital_status),
             'aadhaarNumber' => $this->clean($detail?->aadhaarNo),
-            'panNumber' => Schema::hasColumn('employeeDetails', 'panNo') ? $this->clean($detail?->panNo) : '',
+            'panNumber' => Schema::hasColumn('employeedetails', 'panNo') ? $this->clean($detail?->panNo) : '',
             'location' => $this->clean($employee->location),
             'designation' => $this->appDesignation($employee->designation),
             'photo' => $this->clean($employee->photo),
@@ -758,7 +759,7 @@ class EmployeeAuthController extends Controller
         $detail->salaryProcessingBy = '';
         $detail->salaryProcessingUser = '';
         $detail->aadhaarNo = '';
-        if (Schema::hasColumn('employeeDetails', 'panNo')) {
+        if (Schema::hasColumn('employeedetails', 'panNo')) {
             $detail->panNo = '';
         }
         $detail->uanNumber = '';
@@ -791,7 +792,7 @@ class EmployeeAuthController extends Controller
             }
         }
 
-        $extension = strtolower($image->getClientOriginalExtension() ?: 'jpg');
+        $extension = DecodableImage::extension($image) ?? 'jpg';
         $empId = preg_replace('/[^A-Za-z0-9_-]+/', '-', $this->clean($employee->empId));
         $filename = sprintf(
             'employee_%s_%s_%s.%s',

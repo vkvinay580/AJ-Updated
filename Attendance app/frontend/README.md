@@ -18,7 +18,7 @@ Flutter employee attendance and services application for Android, web, and suppo
 
 
 
-Current application version: `5.0.36+5037`.
+Current application version: `5.0.40+5041`.
 
 
 

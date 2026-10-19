@@ -69,7 +69,7 @@ class FrontendWebController extends Controller
             404
         );
 
-        return response()->file($absolutePath, $this->noCacheFileHeaders());
+        return response()->file($absolutePath, $this->noCacheFileHeaders($absolutePath));
     }
 
     private function frontendWebBuildPath(): string
@@ -115,12 +115,37 @@ class FrontendWebController extends Controller
         ];
     }
 
-    private function noCacheFileHeaders(): array
+    private function noCacheFileHeaders(string $absolutePath): array
     {
         return [
+            'Content-Type' => $this->contentTypeFor($absolutePath),
             'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
             'Pragma' => 'no-cache',
             'Expires' => '0',
         ];
+    }
+
+    private function contentTypeFor(string $absolutePath): string
+    {
+        return match (strtolower(pathinfo($absolutePath, PATHINFO_EXTENSION))) {
+            'bin' => 'application/octet-stream',
+            'css' => 'text/css; charset=UTF-8',
+            'gif' => 'image/gif',
+            'html' => 'text/html; charset=UTF-8',
+            'ico' => 'image/x-icon',
+            'jpeg', 'jpg' => 'image/jpeg',
+            'js' => 'application/javascript; charset=UTF-8',
+            'json', 'map' => 'application/json; charset=UTF-8',
+            'otf' => 'font/otf',
+            'png' => 'image/png',
+            'svg' => 'image/svg+xml',
+            'ttf' => 'font/ttf',
+            'txt' => 'text/plain; charset=UTF-8',
+            'wasm' => 'application/wasm',
+            'webp' => 'image/webp',
+            'woff' => 'font/woff',
+            'woff2' => 'font/woff2',
+            default => 'application/octet-stream',
+        };
     }
 }

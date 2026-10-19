@@ -15,8 +15,8 @@
                 'count' => $summary['pending_approval'],
             ],
             'approved' => [
-                'label' => 'Approved',
-                'count' => $summary['approved_waiting'],
+                'label' => 'Approved / Verified',
+                'count' => $summary['approved_waiting'] + $summary['verified'],
             ],
         ];
         $bulkButtons = match ($activeTab) {
@@ -27,8 +27,8 @@
                 ['action' => 'reject', 'scope' => 'all', 'label' => 'Reject All', 'class' => 'btn-danger'],
             ],
             'approved' => [
-                ['action' => 'reject', 'scope' => 'selected', 'label' => 'Reject Selected', 'class' => 'btn-outline-danger'],
-                ['action' => 'reject', 'scope' => 'all', 'label' => 'Reject All', 'class' => 'btn-danger'],
+                ['action' => 'reject', 'scope' => 'selected', 'label' => 'Reject Waiting Selected', 'class' => 'btn-outline-danger'],
+                ['action' => 'reject', 'scope' => 'all', 'label' => 'Reject All Waiting', 'class' => 'btn-danger'],
             ],
             default => [
                 ['action' => 'approve', 'scope' => 'selected', 'label' => 'Approve Selected', 'class' => 'btn-success'],
@@ -57,7 +57,7 @@
         @endif
 
         <div class="row g-3 mb-4">
-            <div class="col-md-4">
+            <div class="col-lg-3 col-md-6">
                 <div class="card rounded-4 mb-0 attendance-stat-card">
                     <div class="card-body">
                         <p class="mb-1">Pending Verification</p>
@@ -65,7 +65,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-lg-3 col-md-6">
                 <div class="card rounded-4 mb-0 attendance-stat-card">
                     <div class="card-body">
                         <p class="mb-1">Pending Approval</p>
@@ -73,11 +73,19 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-lg-3 col-md-6">
                 <div class="card rounded-4 mb-0 attendance-stat-card">
                     <div class="card-body">
                         <p class="mb-1">Approved, Waiting For Employee</p>
                         <h4 class="mb-0">{{ $summary['approved_waiting'] }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="card rounded-4 mb-0 attendance-stat-card">
+                    <div class="card-body">
+                        <p class="mb-1">Verified</p>
+                        <h4 class="mb-0">{{ $summary['verified'] }}</h4>
                     </div>
                 </div>
             </div>
@@ -167,7 +175,11 @@
                             @forelse ($rows as $row)
                                 <tr>
                                     <td>
-                                        <input type="checkbox" class="form-check-input bank-detail-row-checkbox" value="{{ $row['id'] }}" aria-label="Select request {{ $row['id'] }}">
+                                        @if ($row['status'] !== 'verified')
+                                            <input type="checkbox" class="form-check-input bank-detail-row-checkbox" value="{{ $row['id'] }}" aria-label="Select request {{ $row['id'] }}">
+                                        @else
+                                            <span class="text-muted" aria-label="Completed request">—</span>
+                                        @endif
                                     </td>
                                     <td>{{ $row['created_at'] }}</td>
                                     <td>{{ $row['emp_id'] }}</td>

@@ -13,6 +13,7 @@ use App\Models\EmployeeBankDetailRequest;
 use App\Models\EmployeeDetail;
 use App\Models\LeaveRequest;
 use App\Models\SiteVisitRequest;
+use App\Rules\DecodableImage;
 use App\Services\AttendanceClassificationService;
 use App\Support\AdvancePayrollWindow;
 use App\Support\MayPfEligibility;
@@ -515,7 +516,7 @@ class EmployeeRequestController extends Controller
             'ifsc_code' => ['required', 'string', 'max:30'],
             'uan_number' => ['nullable', 'string', 'regex:/^\d{12}$/'],
             'request_note' => ['nullable', 'string', 'max:2000'],
-            'passbook_doc' => ['nullable', 'image', 'max:5120'],
+            'passbook_doc' => ['nullable', 'file', 'max:5120', new DecodableImage],
         ]);
 
         $requestedPassbookDoc = $requestRecord->requested_passbook_doc;
@@ -559,7 +560,7 @@ class EmployeeRequestController extends Controller
             'longitude' => ['required', 'numeric'],
             'reason' => ['required', 'string', 'min:5', 'max:2000'],
             'approved_by' => ['required', 'string', 'max:255'],
-            'photo' => ['required', 'image', 'max:5120'],
+            'photo' => ['required', 'file', 'max:5120', new DecodableImage],
         ]);
 
         $today = Carbon::today(config('app.timezone', 'Asia/Kolkata'));
@@ -854,7 +855,7 @@ class EmployeeRequestController extends Controller
             File::makeDirectory($directory, 0777, true);
         }
 
-        $extension = strtolower($image->getClientOriginalExtension() ?: 'jpg');
+        $extension = DecodableImage::extension($image) ?? 'jpg';
         $empId = preg_replace('/[^A-Za-z0-9_-]+/', '-', $this->clean($employee->empId));
         $filename = sprintf(
             'site_visit_%s_%s_%s.%s',
@@ -1030,7 +1031,7 @@ class EmployeeRequestController extends Controller
             }
         }
 
-        $extension = strtolower($image->getClientOriginalExtension() ?: 'jpg');
+        $extension = DecodableImage::extension($image) ?? 'jpg';
         $empId = preg_replace('/[^A-Za-z0-9_-]+/', '-', $this->clean($employee->empId));
         $filename = sprintf(
             'passbook_%s_%s_%s.%s',

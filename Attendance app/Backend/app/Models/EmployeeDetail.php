@@ -2,13 +2,13 @@
 
 namespace App\Models;
 
-use App\Casts\EncryptedString;
+use App\Casts\EncryptedStringOrEmpty;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EmployeeDetail extends Model
 {
-    protected $table = 'employeeDetails';
+    protected $table = 'employeedetails';
 
     public $timestamps = false;
 
@@ -51,11 +51,11 @@ class EmployeeDetail extends Model
     ];
 
     protected $casts = [
-        'bankAcNo' => EncryptedString::class,
-        'ifscCode' => EncryptedString::class,
-        'aadhaarNo' => EncryptedString::class,
-        'panNo' => EncryptedString::class,
-        'uanNumber' => EncryptedString::class,
+        'bankAcNo' => EncryptedStringOrEmpty::class,
+        'ifscCode' => EncryptedStringOrEmpty::class,
+        'aadhaarNo' => EncryptedStringOrEmpty::class,
+        'panNo' => EncryptedStringOrEmpty::class,
+        'uanNumber' => EncryptedStringOrEmpty::class,
         'salary' => 'decimal:2',
         'pfAmount' => 'decimal:2',
         'totalWorkingDays' => 'decimal:2',

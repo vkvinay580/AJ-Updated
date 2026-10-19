@@ -43,6 +43,12 @@ const double _attendanceFraudConfidenceThreshold = 0.95;
 const Duration _attendanceUploadTimeout = Duration(seconds: 60);
 const String _googlePlayStoreUrl =
     'https://play.google.com/store/apps/details?id=aryan.attendance&pcampaignid=web_share';
+final ValueNotifier<bool> _launchSplashVisible = ValueNotifier<bool>(true);
+const Duration _motionFast = Duration(milliseconds: 180);
+const Duration _motionStandard = Duration(milliseconds: 360);
+const Duration _motionEmphasized = Duration(milliseconds: 480);
+const Curve _motionEnterCurve = Curves.easeOutCubic;
+const Curve _motionExitCurve = Curves.easeInCubic;
 
 String _newAttendanceSubmissionId() {
   final bytes = List<int>.generate(16, (_) => Random.secure().nextInt(256));
@@ -279,7 +285,7 @@ class AttendanceNotificationService {
           icon: _notificationIcon,
           importance: Importance.max,
           priority: Priority.max,
-          color: Color(0xFFFF477E),
+          color: AppColors.primary,
           colorized: true,
           autoCancel: true,
           styleInformation: BigTextStyleInformation(
@@ -1215,6 +1221,283 @@ class _HiddenScrollbarBehavior extends MaterialScrollBehavior {
   }
 }
 
+class _AryanPageTransitionsBuilder extends PageTransitionsBuilder {
+  const _AryanPageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (reduceMotion || route.isFirst) {
+      return FadeTransition(opacity: animation, child: child);
+    }
+
+    final entrance = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+    return FadeTransition(
+      opacity: entrance,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0.035, 0.018),
+          end: Offset.zero,
+        ).animate(entrance),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _AryanPageRoute<T> extends PageRouteBuilder<T> {
+  _AryanPageRoute({
+    required WidgetBuilder builder,
+    super.settings,
+    super.fullscreenDialog = false,
+  }) : super(
+         transitionDuration: _motionEmphasized,
+         reverseTransitionDuration: _motionStandard,
+         pageBuilder: (context, animation, secondaryAnimation) =>
+             builder(context),
+         transitionsBuilder: (context, animation, secondaryAnimation, child) {
+           if (MediaQuery.maybeOf(context)?.disableAnimations == true) {
+             return child;
+           }
+
+           final entrance = CurvedAnimation(
+             parent: animation,
+             curve: _motionEnterCurve,
+             reverseCurve: _motionExitCurve,
+           );
+           final exit = CurvedAnimation(
+             parent: secondaryAnimation,
+             curve: _motionEnterCurve,
+             reverseCurve: _motionExitCurve,
+           );
+
+           return FadeTransition(
+             opacity: entrance,
+             child: SlideTransition(
+               position: Tween<Offset>(
+                 begin: Offset(
+                   fullscreenDialog ? 0 : 0.045,
+                   fullscreenDialog ? 0.06 : 0.012,
+                 ),
+                 end: Offset.zero,
+               ).animate(entrance),
+               child: ScaleTransition(
+                 scale: Tween<double>(begin: 0.985, end: 1).animate(entrance),
+                 child: SlideTransition(
+                   position: Tween<Offset>(
+                     begin: Offset.zero,
+                     end: const Offset(-0.018, 0),
+                   ).animate(exit),
+                   child: child,
+                 ),
+               ),
+             ),
+           );
+         },
+       );
+}
+
+Future<T?> _showAryanDialog<T>({
+  required BuildContext context,
+  required WidgetBuilder builder,
+  bool barrierDismissible = true,
+}) {
+  return showGeneralDialog<T>(
+    context: context,
+    barrierDismissible: barrierDismissible,
+    barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+    barrierColor: Colors.black.withValues(alpha: 0.42),
+    transitionDuration: _motionStandard,
+    pageBuilder: (dialogContext, animation, secondaryAnimation) =>
+        builder(dialogContext),
+    transitionBuilder: (dialogContext, animation, secondaryAnimation, child) {
+      if (MediaQuery.maybeOf(dialogContext)?.disableAnimations == true) {
+        return child;
+      }
+      final entrance = CurvedAnimation(
+        parent: animation,
+        curve: _motionEnterCurve,
+        reverseCurve: _motionExitCurve,
+      );
+      return FadeTransition(
+        opacity: entrance,
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.94, end: 1).animate(entrance),
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.025),
+              end: Offset.zero,
+            ).animate(entrance),
+            child: child,
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _MotionEntrance extends StatefulWidget {
+  const _MotionEntrance({required this.child, this.delay = Duration.zero});
+
+  final Widget child;
+  final Duration delay;
+
+  @override
+  State<_MotionEntrance> createState() => _MotionEntranceState();
+}
+
+class _MotionEntranceState extends State<_MotionEntrance>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  Timer? _delayTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: _motionEmphasized);
+    _delayTimer = Timer(widget.delay, _start);
+  }
+
+  void _start() {
+    if (mounted) {
+      _controller.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _delayTimer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.maybeOf(context)?.disableAnimations == true) {
+      return widget.child;
+    }
+    final entrance = CurvedAnimation(
+      parent: _controller,
+      curve: _motionEnterCurve,
+    );
+    return FadeTransition(
+      opacity: entrance,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.07),
+          end: Offset.zero,
+        ).animate(entrance),
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+class _PressableScale extends StatefulWidget {
+  const _PressableScale({required this.child, this.enabled = true});
+
+  final Widget child;
+  final bool enabled;
+
+  @override
+  State<_PressableScale> createState() => _PressableScaleState();
+}
+
+class _PressableScaleState extends State<_PressableScale> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed == value || !widget.enabled) return;
+    setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations == true;
+    return Listener(
+      onPointerDown: (_) => _setPressed(true),
+      onPointerUp: (_) => _setPressed(false),
+      onPointerCancel: (_) => _setPressed(false),
+      child: AnimatedScale(
+        scale: reduceMotion || !_pressed ? 1 : 0.985,
+        duration: _motionFast,
+        curve: _motionEnterCurve,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+class _AnimatedSubmitContent extends StatelessWidget {
+  const _AnimatedSubmitContent({
+    required this.isBusy,
+    required this.label,
+    this.busyLabel = 'Submitting...',
+    this.icon,
+  });
+
+  final bool isBusy;
+  final String label;
+  final String busyLabel;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations == true;
+    return AnimatedSwitcher(
+      duration: reduceMotion ? Duration.zero : _motionFast,
+      switchInCurve: _motionEnterCurve,
+      switchOutCurve: _motionExitCurve,
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: animation,
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.94, end: 1).animate(animation),
+          child: child,
+        ),
+      ),
+      child: isBusy
+          ? Row(
+              key: const ValueKey('busy'),
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(busyLabel),
+              ],
+            )
+          : Row(
+              key: const ValueKey('ready'),
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (icon != null) ...[
+                  Icon(icon, size: 19),
+                  const SizedBox(width: 8),
+                ],
+                Text(label),
+              ],
+            ),
+    );
+  }
+}
+
 class EmployeePortalApp extends StatelessWidget {
   const EmployeePortalApp({super.key});
 
@@ -1242,32 +1525,46 @@ class EmployeePortalApp extends StatelessWidget {
           return child ?? const SizedBox.shrink();
         }
 
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final viewportWidth = constraints.maxWidth > 1200
-                ? 1200.0
-                : constraints.maxWidth;
-            final mediaQuery = MediaQuery.of(context);
+        return ValueListenableBuilder<bool>(
+          valueListenable: _launchSplashVisible,
+          builder: (context, showFullScreenSplash, _) => LayoutBuilder(
+            builder: (context, constraints) {
+              final viewportWidth = showFullScreenSplash
+                  ? constraints.maxWidth
+                  : min(1200.0, constraints.maxWidth);
+              final mediaQuery = MediaQuery.of(context);
 
-            return ColoredBox(
-              color: AppColors.background,
-              child: Center(
-                child: SizedBox(
-                  width: viewportWidth,
-                  height: constraints.maxHeight,
-                  child: MediaQuery(
-                    data: mediaQuery.copyWith(
-                      size: Size(viewportWidth, mediaQuery.size.height),
+              return ColoredBox(
+                color: showFullScreenSplash
+                    ? const Color(0xFF032E2A)
+                    : AppColors.background,
+                child: Center(
+                  child: SizedBox(
+                    width: viewportWidth,
+                    height: constraints.maxHeight,
+                    child: MediaQuery(
+                      data: mediaQuery.copyWith(
+                        size: Size(viewportWidth, mediaQuery.size.height),
+                      ),
+                      child: child,
                     ),
-                    child: child,
                   ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         );
       },
       theme: baseTheme.copyWith(
+        pageTransitionsTheme: const PageTransitionsTheme(
+          builders: {
+            TargetPlatform.android: _AryanPageTransitionsBuilder(),
+            TargetPlatform.iOS: _AryanPageTransitionsBuilder(),
+            TargetPlatform.macOS: _AryanPageTransitionsBuilder(),
+            TargetPlatform.windows: _AryanPageTransitionsBuilder(),
+            TargetPlatform.linux: _AryanPageTransitionsBuilder(),
+          },
+        ),
         appBarTheme: AppBarTheme(
           backgroundColor: AppColors.background,
           surfaceTintColor: Colors.transparent,
@@ -1288,6 +1585,7 @@ class EmployeePortalApp extends StatelessWidget {
             backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
             minimumSize: const Size(48, 48),
+            animationDuration: _motionFast,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
             ),
@@ -1298,6 +1596,7 @@ class EmployeePortalApp extends StatelessWidget {
           style: OutlinedButton.styleFrom(
             foregroundColor: AppColors.primaryDark,
             minimumSize: const Size(48, 48),
+            animationDuration: _motionFast,
             side: const BorderSide(color: AppColors.primary),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
@@ -1333,13 +1632,32 @@ class EmployeePortalApp extends StatelessWidget {
             borderSide: const BorderSide(color: AppColors.secondary, width: 2),
           ),
         ),
-        snackBarTheme: const SnackBarThemeData(
+        snackBarTheme: SnackBarThemeData(
           behavior: SnackBarBehavior.floating,
           backgroundColor: AppColors.text,
-          contentTextStyle: TextStyle(
+          elevation: 10,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          insetPadding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
+          contentTextStyle: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.w600,
           ),
+        ),
+        dialogTheme: DialogThemeData(
+          backgroundColor: AppColors.surface,
+          surfaceTintColor: Colors.transparent,
+          elevation: 18,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+        ),
+        bottomSheetTheme: const BottomSheetThemeData(
+          backgroundColor: AppColors.surface,
+          surfaceTintColor: Colors.transparent,
+          modalElevation: 18,
+          showDragHandle: true,
         ),
         floatingActionButtonTheme: const FloatingActionButtonThemeData(
           backgroundColor: AppColors.accent,
@@ -1409,6 +1727,7 @@ class _StartupScreenState extends State<_StartupScreen> {
       return;
     }
 
+    _launchSplashVisible.value = false;
     setState(() {
       _showSplash = false;
       _checkingBiometricLock = true;
@@ -1446,7 +1765,18 @@ class _StartupScreenState extends State<_StartupScreen> {
   @override
   Widget build(BuildContext context) {
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 280),
+      duration: MediaQuery.maybeOf(context)?.disableAnimations == true
+          ? Duration.zero
+          : const Duration(milliseconds: 520),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: animation,
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.985, end: 1).animate(animation),
+          child: child,
+        ),
+      ),
       child: _showSplash
           ? _LaunchSplashScreen(
               key: const ValueKey('launch-splash'),
@@ -1582,26 +1912,72 @@ class _LaunchSplashScreen extends StatefulWidget {
 class _LaunchSplashScreenState extends State<_LaunchSplashScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _splashController;
-  late final Animation<double> _fadeAnimation;
-  late final Animation<double> _scaleAnimation;
+  late final Animation<double> _logoFadeAnimation;
+  late final Animation<double> _logoScaleAnimation;
+  late final Animation<double> _copyFadeAnimation;
+  late final Animation<Offset> _copySlideAnimation;
+  late final Animation<double> _progressAnimation;
   Timer? _splashFallbackTimer;
   bool _didFinishSplash = false;
+  bool _didConfigureMotion = false;
 
   @override
   void initState() {
     super.initState();
     _splashController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1450),
+      duration: const Duration(milliseconds: 2200),
     );
-    _fadeAnimation = CurvedAnimation(
+    _logoFadeAnimation = CurvedAnimation(
       parent: _splashController,
-      curve: Curves.easeOutCubic,
+      curve: const Interval(0, 0.42, curve: Curves.easeOutCubic),
     );
-    _scaleAnimation = Tween<double>(begin: 0.92, end: 1).animate(
-      CurvedAnimation(parent: _splashController, curve: Curves.easeOutBack),
+    _logoScaleAnimation = Tween<double>(begin: 0.78, end: 1).animate(
+      CurvedAnimation(
+        parent: _splashController,
+        curve: const Interval(0, 0.5, curve: Curves.easeOutBack),
+      ),
     );
-    _splashFallbackTimer = Timer(const Duration(seconds: 2), _finishSplash);
+    _copyFadeAnimation = CurvedAnimation(
+      parent: _splashController,
+      curve: const Interval(0.28, 0.68, curve: Curves.easeOut),
+    );
+    _copySlideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.22), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _splashController,
+            curve: const Interval(0.28, 0.68, curve: Curves.easeOutCubic),
+          ),
+        );
+    _progressAnimation = CurvedAnimation(
+      parent: _splashController,
+      curve: const Interval(0.14, 0.92, curve: Curves.easeInOutCubic),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_didConfigureMotion) {
+      return;
+    }
+    _didConfigureMotion = true;
+
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (reduceMotion) {
+      _splashController.value = 1;
+      _splashFallbackTimer = Timer(
+        const Duration(milliseconds: 650),
+        _finishSplash,
+      );
+      return;
+    }
+
+    _splashFallbackTimer = Timer(
+      const Duration(milliseconds: 2600),
+      _finishSplash,
+    );
     _splashController.forward(from: 0).whenComplete(_finishSplash);
   }
 
@@ -1625,32 +2001,293 @@ class _LaunchSplashScreenState extends State<_LaunchSplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
-      body: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppColors.background,
-              AppColors.surfaceTint,
-              AppColors.primarySoft,
-            ],
-          ),
-        ),
-        child: Center(
-          child: FadeTransition(
-            opacity: _fadeAnimation,
-            child: ScaleTransition(
-              scale: _scaleAnimation,
-              child: Image.asset(
-                'assets/images/aryan_gold_splash_logo.png',
-                width: 320,
-                height: 320,
-                fit: BoxFit.contain,
-                filterQuality: FilterQuality.high,
+      backgroundColor: const Color(0xFF032E2A),
+      body: SizedBox.expand(
+        child: AnimatedBuilder(
+          animation: _splashController,
+          builder: (context, _) => Stack(
+            fit: StackFit.expand,
+            children: [
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFF021F1D),
+                      Color(0xFF064D47),
+                      Color(0xFF006A64),
+                    ],
+                    stops: [0, 0.56, 1],
+                  ),
+                ),
               ),
-            ),
+              CustomPaint(
+                painter: _SplashBackdropPainter(
+                  progress: _splashController.value,
+                ),
+              ),
+              const Positioned(
+                top: -180,
+                right: -130,
+                child: _SplashOrb(
+                  size: 410,
+                  colors: [Color(0x38F5C21B), Color(0x00F5C21B)],
+                  borderColor: Color(0x34F5C21B),
+                ),
+              ),
+              const Positioned(
+                bottom: -220,
+                left: -160,
+                child: _SplashOrb(
+                  size: 470,
+                  colors: [Color(0x42A11E1E), Color(0x00A11E1E)],
+                  borderColor: Color(0x34F5C21B),
+                ),
+              ),
+              SafeArea(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final compact = constraints.maxHeight < 650;
+                    final wide = constraints.maxWidth >= 760;
+                    final markSize = min(
+                      wide ? 270.0 : (compact ? 166.0 : 212.0),
+                      min(
+                        constraints.maxWidth * (wide ? 0.34 : 0.54),
+                        constraints.maxHeight * (wide ? 0.38 : 0.31),
+                      ),
+                    );
+                    final ringSize = markSize + (wide ? 92 : 66);
+
+                    return Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: wide ? 52 : 24,
+                        vertical: compact ? 18 : 28,
+                      ),
+                      child: Column(
+                        children: [
+                          FadeTransition(
+                            opacity: _copyFadeAnimation,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.07),
+                                borderRadius: BorderRadius.circular(99),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.12),
+                                ),
+                              ),
+                              child: Text(
+                                'ARYAN GOLD  •  PEOPLE & OPERATIONS',
+                                style: GoogleFonts.manrope(
+                                  color: const Color(0xFFEBCB6B),
+                                  fontSize: wide ? 11 : 9,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: wide ? 1.8 : 1.25,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          SizedBox(
+                            width: ringSize,
+                            height: ringSize,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Transform.rotate(
+                                  angle: _splashController.value * pi * 1.4,
+                                  child: CustomPaint(
+                                    size: Size.square(ringSize),
+                                    painter: _SplashOrbitPainter(
+                                      color: const Color(0xFFEBCB6B),
+                                      progress: _splashController.value,
+                                    ),
+                                  ),
+                                ),
+                                Transform.rotate(
+                                  angle: -_splashController.value * pi * 0.62,
+                                  child: Container(
+                                    width: markSize + (wide ? 48 : 36),
+                                    height: markSize + (wide ? 48 : 36),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: const Color(
+                                          0xFFEBCB6B,
+                                        ).withValues(alpha: 0.42),
+                                        width: 1.2,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Container(
+                                  width: markSize + 22,
+                                  height: markSize + 22,
+                                  decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: RadialGradient(
+                                      colors: [
+                                        Color(0x52F5C21B),
+                                        Color(0x00F5C21B),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: markSize,
+                                  height: markSize,
+                                  child: FadeTransition(
+                                    opacity: _logoFadeAnimation,
+                                    child: ScaleTransition(
+                                      scale: _logoScaleAnimation,
+                                      child: DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          gradient: const LinearGradient(
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                            colors: [
+                                              Color(0xFFFFFFFF),
+                                              Color(0xFFFFF7E3),
+                                            ],
+                                          ),
+                                          border: Border.all(
+                                            color: const Color(0xFFEBCB6B),
+                                            width: 2,
+                                          ),
+                                          boxShadow: const [
+                                            BoxShadow(
+                                              color: Color(0x66001210),
+                                              blurRadius: 54,
+                                              spreadRadius: 2,
+                                              offset: Offset(0, 24),
+                                            ),
+                                            BoxShadow(
+                                              color: Color(0x38F5C21B),
+                                              blurRadius: 30,
+                                            ),
+                                          ],
+                                        ),
+                                        child: Padding(
+                                          padding: EdgeInsets.all(
+                                            wide ? 22 : 16,
+                                          ),
+                                          child: Image.asset(
+                                            'assets/images/aryan_gold_logo.png',
+                                            fit: BoxFit.contain,
+                                            filterQuality: FilterQuality.high,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(height: compact ? 12 : (wide ? 26 : 20)),
+                          FadeTransition(
+                            opacity: _copyFadeAnimation,
+                            child: SlideTransition(
+                              position: _copySlideAnimation,
+                              child: Column(
+                                children: [
+                                  Text(
+                                    'ARYAN GOLD ATTENDANCE',
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.manrope(
+                                      color: Colors.white,
+                                      fontSize: wide ? 25 : (compact ? 18 : 21),
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: wide ? 4.8 : 3.1,
+                                    ),
+                                  ),
+                                  SizedBox(height: compact ? 5 : 9),
+                                  Text(
+                                    'Your workday. Connected.',
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.manrope(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.72,
+                                      ),
+                                      fontSize: wide ? 15 : 13,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 0.4,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          FadeTransition(
+                            opacity: _copyFadeAnimation,
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxWidth: wide ? 360 : 290,
+                              ),
+                              child: Column(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(99),
+                                    child: SizedBox(
+                                      height: 4,
+                                      child: LinearProgressIndicator(
+                                        value: _progressAnimation.value,
+                                        backgroundColor: Colors.white
+                                            .withValues(alpha: 0.12),
+                                        valueColor:
+                                            const AlwaysStoppedAnimation<Color>(
+                                              Color(0xFFEBCB6B),
+                                            ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Container(
+                                        width: 6,
+                                        height: 6,
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFFEBCB6B),
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 9),
+                                      Flexible(
+                                        child: Text(
+                                          'Preparing your secure workspace',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: GoogleFonts.manrope(
+                                            color: Colors.white.withValues(
+                                              alpha: 0.78,
+                                            ),
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: 0.35,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -1658,31 +2295,139 @@ class _LaunchSplashScreenState extends State<_LaunchSplashScreen>
   }
 }
 
+class _SplashOrb extends StatelessWidget {
+  const _SplashOrb({
+    required this.size,
+    required this.colors,
+    required this.borderColor,
+  });
+
+  final double size;
+  final List<Color> colors;
+  final Color borderColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(colors: colors),
+        border: Border.all(color: borderColor),
+      ),
+    );
+  }
+}
+
+class _SplashOrbitPainter extends CustomPainter {
+  const _SplashOrbitPainter({required this.color, required this.progress});
+
+  final Color color;
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.shortestSide / 2 - 7;
+    final ringPaint = Paint()
+      ..color = color.withValues(alpha: 0.56)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4
+      ..strokeCap = StrokeCap.round;
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      -pi * 0.88,
+      pi * 0.72,
+      false,
+      ringPaint,
+    );
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      pi * 0.12,
+      pi * 0.54,
+      false,
+      ringPaint..color = color.withValues(alpha: 0.25),
+    );
+
+    final dotPaint = Paint()..color = color;
+    final angle = -pi * 0.88 + (pi * 0.72 * progress);
+    canvas.drawCircle(
+      center + Offset(cos(angle), sin(angle)) * radius,
+      4.2,
+      dotPaint,
+    );
+    canvas.drawCircle(
+      center + Offset(cos(angle + pi), sin(angle + pi)) * (radius - 1),
+      2.6,
+      dotPaint..color = color.withValues(alpha: 0.7),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _SplashOrbitPainter oldDelegate) =>
+      oldDelegate.progress != progress || oldDelegate.color != color;
+}
+
+class _SplashBackdropPainter extends CustomPainter {
+  const _SplashBackdropPainter({required this.progress});
+
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final linePaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.035)
+      ..strokeWidth = 1;
+    const spacing = 58.0;
+    final drift = progress * 12;
+    for (double x = -spacing + drift; x < size.width + spacing; x += spacing) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), linePaint);
+    }
+    for (double y = -spacing + drift; y < size.height + spacing; y += spacing) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), linePaint);
+    }
+
+    final center = Offset(size.width / 2, size.height / 2);
+    final haloPaint = Paint()
+      ..color = const Color(0xFFEBCB6B).withValues(alpha: 0.06)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    for (final scale in [0.34, 0.48, 0.64]) {
+      canvas.drawCircle(center, size.shortestSide * scale, haloPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SplashBackdropPainter oldDelegate) =>
+      oldDelegate.progress != progress;
+}
+
 class AppColors {
-  static const background = Color(0xFFFFF8EC);
-  static const surface = Color(0xFFFFFFFF);
-  static const surfaceTint = Color(0xFFFFE9BF);
-  static const primary = Color(0xFF006E6C);
-  static const primaryDark = Color(0xFF004D50);
-  static const primarySoft = Color(0xFFD7F0EA);
-  static const accent = Color(0xFFE0B13A);
-  static const secondary = Color(0xFF8B101C);
+  static const background = Color(0xFFFDF4E6);
+  static const surface = Color(0xFFFFFCF7);
+  static const surfaceTint = Color(0xFFFFF1C2);
+  static const primary = Color(0xFF006A64);
+  static const primaryDark = Color(0xFF004D49);
+  static const primarySoft = Color(0xFFDCEDEA);
+  static const accent = Color(0xFFF5C21B);
+  static const secondary = Color(0xFFA11E1E);
   static const text = Color(0xFF1F2B28);
   static const subtleText = Color(0xFF66736A);
   static const success = Color(0xFF168554);
 }
 
 class BirthdayAppColors {
-  static const background = Color(0xFFFFF1F7);
-  static const surface = Color(0xFFFFFBFF);
-  static const surfaceTint = Color(0xFFFFD9E8);
-  static const primary = Color(0xFFFF477E);
-  static const primaryDark = Color(0xFF6F2AD1);
-  static const primarySoft = Color(0xFFFFC7DB);
-  static const accent = Color(0xFFFFB52E);
-  static const secondary = Color(0xFF7B2CFF);
-  static const text = Color(0xFF35133F);
-  static const subtleText = Color(0xFF80556F);
+  static const background = AppColors.background;
+  static const surface = AppColors.surface;
+  static const surfaceTint = AppColors.surfaceTint;
+  static const primary = AppColors.primary;
+  static const primaryDark = AppColors.primaryDark;
+  static const primarySoft = AppColors.primarySoft;
+  static const accent = AppColors.accent;
+  static const secondary = AppColors.secondary;
+  static const text = AppColors.text;
+  static const subtleText = AppColors.subtleText;
 }
 
 ThemeData _birthdayAppTheme(BuildContext context) {
@@ -3191,7 +3936,7 @@ class EmployeeDocument {
     required this.uploadedAt,
   });
 
-  final int id;
+  final String id;
   final String type;
   final String title;
   final String fileName;
@@ -3200,7 +3945,7 @@ class EmployeeDocument {
 
   factory EmployeeDocument.fromJson(Map<String, dynamic> json) =>
       EmployeeDocument(
-        id: int.tryParse(json['id']?.toString() ?? '') ?? 0,
+        id: json['id']?.toString() ?? '',
         type: json['type']?.toString() ?? '',
         title: json['title']?.toString() ?? 'Employee document',
         fileName: json['fileName']?.toString() ?? '',
@@ -6281,56 +7026,81 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    late final Widget content;
+
     if (_requiredAppUpdate != null) {
-      return _RequiredUpdateScreen(
-        update: _requiredAppUpdate!,
-        currentVersion: _packageInfo == null
-            ? ''
-            : '${_packageInfo!.version} (${_packageInfo!.buildNumber})',
-        isOpeningUpdate: _isOpeningAppUpdate,
-        errorText: _appUpdateErrorText,
-        onUpdateNow: _openRequiredUpdate,
+      content = KeyedSubtree(
+        key: const ValueKey('required-update'),
+        child: _RequiredUpdateScreen(
+          update: _requiredAppUpdate!,
+          currentVersion: _packageInfo == null
+              ? ''
+              : '${_packageInfo!.version} (${_packageInfo!.buildNumber})',
+          isOpeningUpdate: _isOpeningAppUpdate,
+          errorText: _appUpdateErrorText,
+          onUpdateNow: _openRequiredUpdate,
+        ),
+      );
+    } else if (_isCheckingAppUpdate) {
+      content = const KeyedSubtree(
+        key: ValueKey('checking-update'),
+        child: _SessionBootstrapScreen(
+          title: 'Checking app version',
+          subtitle: 'Verifying whether an update is required.',
+        ),
+      );
+    } else if (_isRestoringSession) {
+      content = const KeyedSubtree(
+        key: ValueKey('restoring-session'),
+        child: _SessionBootstrapScreen(),
+      );
+    } else if (_employee == null) {
+      content = KeyedSubtree(
+        key: const ValueKey('login'),
+        child: LoginScreen(onLogin: _handleLogin),
+      );
+    } else {
+      final birthday = _parseYmdDate(_employee!.dateOfBirth);
+      final today = DateTime.now();
+      final isBirthdayToday =
+          birthday != null &&
+          birthday.month == today.month &&
+          birthday.day == today.day;
+      final dashboard = DashboardScreen(
+        employee: _employee!,
+        token: _token!,
+        notifications: _adminNotifications,
+        unreadNotificationCount: _unreadAdminNotificationCount,
+        onLogout: _handleLogout,
+        onSessionExpired: _handleSessionExpired,
+        onEmployeeUpdated: _handleEmployeeUpdated,
+        onNotificationsViewed: _handleAdminNotificationsViewed,
+        onAttendanceChanged: _syncAttendanceLocationTracking,
+      );
+
+      content = KeyedSubtree(
+        key: const ValueKey('dashboard'),
+        child: isBirthdayToday
+            ? Theme(data: _birthdayAppTheme(context), child: dashboard)
+            : dashboard,
       );
     }
 
-    if (_isCheckingAppUpdate) {
-      return const _SessionBootstrapScreen(
-        title: 'Checking app version',
-        subtitle: 'Verifying whether an update is required.',
-      );
-    }
-
-    if (_isRestoringSession) {
-      return const _SessionBootstrapScreen();
-    }
-
-    if (_employee == null) {
-      return LoginScreen(onLogin: _handleLogin);
-    }
-
-    final birthday = _parseYmdDate(_employee!.dateOfBirth);
-    final today = DateTime.now();
-    final isBirthdayToday =
-        birthday != null &&
-        birthday.month == today.month &&
-        birthday.day == today.day;
-    final dashboard = DashboardScreen(
-      employee: _employee!,
-      token: _token!,
-      notifications: _adminNotifications,
-      unreadNotificationCount: _unreadAdminNotificationCount,
-      onLogout: _handleLogout,
-      onSessionExpired: _handleSessionExpired,
-      onEmployeeUpdated: _handleEmployeeUpdated,
-      onNotificationsViewed: _handleAdminNotificationsViewed,
-      onAttendanceChanged: _syncAttendanceLocationTracking,
+    final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations == true;
+    return AnimatedSwitcher(
+      duration: reduceMotion ? Duration.zero : _motionEmphasized,
+      reverseDuration: reduceMotion ? Duration.zero : _motionStandard,
+      switchInCurve: _motionEnterCurve,
+      switchOutCurve: _motionExitCurve,
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: animation,
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.985, end: 1).animate(animation),
+          child: child,
+        ),
+      ),
+      child: content,
     );
-
-    if (!isBirthdayToday) {
-      return dashboard;
-    }
-
-    return Theme(data: _birthdayAppTheme(context), child: dashboard);
   }
 }
 
@@ -6843,7 +7613,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
     final confirmController = TextEditingController();
 
-    return showDialog<String>(
+    return _showAryanDialog<String>(
       context: context,
       barrierDismissible: false,
       builder: (context) {
@@ -6944,15 +7714,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     key: const Key('login-header-background'),
                     width: headerWidth,
                     height: viewportConstraints.maxHeight * 0.3,
-                    child: const DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [AppColors.primaryDark, AppColors.primary],
-                        ),
-                      ),
-                    ),
+                    child: const _LoginBackdrop(),
                   ),
                 ),
                 SafeArea(
@@ -7007,15 +7769,27 @@ class _LoginScreenState extends State<LoginScreen> {
                                   child: Container(
                                     key: const Key('login-card'),
                                     decoration: BoxDecoration(
-                                      color: Colors.white,
+                                      color: Colors.white.withValues(
+                                        alpha: 0.97,
+                                      ),
                                       borderRadius: BorderRadius.circular(
                                         isCompact ? 24 : 28,
                                       ),
+                                      border: Border.all(
+                                        color: AppColors.accent.withValues(
+                                          alpha: 0.38,
+                                        ),
+                                      ),
                                       boxShadow: const [
                                         BoxShadow(
-                                          color: Color(0x1A2D0A6D),
-                                          blurRadius: 40,
-                                          offset: Offset(0, 20),
+                                          color: Color(0x26004D49),
+                                          blurRadius: 48,
+                                          offset: Offset(0, 22),
+                                        ),
+                                        BoxShadow(
+                                          color: Color(0x18F5C21B),
+                                          blurRadius: 18,
+                                          offset: Offset(0, 4),
                                         ),
                                       ],
                                     ),
@@ -7041,19 +7815,81 @@ class _LoginScreenState extends State<LoginScreen> {
                                                 height: isCompact ? 14 : 24,
                                               ),
                                             ],
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    'Welcome back',
+                                                    style: theme
+                                                        .textTheme
+                                                        .headlineMedium
+                                                        ?.copyWith(
+                                                          fontSize: isCompact
+                                                              ? 24
+                                                              : null,
+                                                          color: AppColors
+                                                              .primaryDark,
+                                                        ),
+                                                  ),
+                                                ),
+                                                Container(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 10,
+                                                        vertical: 7,
+                                                      ),
+                                                  decoration: BoxDecoration(
+                                                    color:
+                                                        AppColors.primarySoft,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          99,
+                                                        ),
+                                                    border: Border.all(
+                                                      color: const Color(
+                                                        0x33006A64,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  child: const Row(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    children: [
+                                                      Icon(
+                                                        Icons
+                                                            .verified_user_outlined,
+                                                        size: 15,
+                                                        color:
+                                                            AppColors.primary,
+                                                      ),
+                                                      SizedBox(width: 5),
+                                                      Text(
+                                                        'SECURE',
+                                                        style: TextStyle(
+                                                          color: AppColors
+                                                              .primaryDark,
+                                                          fontSize: 10,
+                                                          fontWeight:
+                                                              FontWeight.w800,
+                                                          letterSpacing: 0.8,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 5),
                                             Text(
-                                              'Welcome back',
-                                              style: theme
-                                                  .textTheme
-                                                  .headlineMedium
+                                              'Sign in to your employee workspace',
+                                              style: theme.textTheme.bodyMedium
                                                   ?.copyWith(
-                                                    fontSize: isCompact
-                                                        ? 24
-                                                        : null,
+                                                    color: AppColors.subtleText,
+                                                    fontWeight: FontWeight.w500,
                                                   ),
                                             ),
                                             SizedBox(
-                                              height: isCompact ? 12 : 20,
+                                              height: isCompact ? 16 : 22,
                                             ),
                                             TextFormField(
                                               key: const ValueKey(
@@ -7341,11 +8177,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                                   decoration:
                                                       const BoxDecoration(
                                                         gradient: LinearGradient(
+                                                          begin: Alignment
+                                                              .centerLeft,
+                                                          end: Alignment
+                                                              .centerRight,
                                                           colors: [
                                                             AppColors
                                                                 .primaryDark,
                                                             AppColors.primary,
-                                                            AppColors.accent,
                                                           ],
                                                         ),
                                                       ),
@@ -7380,31 +8219,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                                                 ? 14
                                                                 : 16,
                                                           ),
-                                                      child: _isLoading
-                                                          ? const SizedBox(
-                                                              width: 22,
-                                                              height: 22,
-                                                              child:
-                                                                  CircularProgressIndicator(
-                                                                    strokeWidth:
-                                                                        2.4,
-                                                                    color: Colors
-                                                                        .white,
-                                                                  ),
-                                                            )
-                                                          : Text(
-                                                              'Sign In',
-                                                              style: theme
-                                                                  .textTheme
-                                                                  .titleMedium
-                                                                  ?.copyWith(
-                                                                    color: Colors
-                                                                        .white,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w700,
-                                                                  ),
-                                                            ),
+                                                      child: _AnimatedSubmitContent(
+                                                        isBusy: _isLoading,
+                                                        label: 'Sign In',
+                                                        busyLabel:
+                                                            'Signing in...',
+                                                        icon: Icons
+                                                            .arrow_forward_rounded,
+                                                      ),
                                                     ),
                                                   ),
                                                 ),
@@ -7491,9 +8313,9 @@ class _LoginScreenState extends State<LoginScreen> {
         alignment: Alignment.center,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         decoration: BoxDecoration(
-          color: AppColors.surfaceTint,
-          border: Border.all(color: AppColors.secondary, width: 1),
-          borderRadius: BorderRadius.circular(5),
+          color: Colors.white,
+          border: Border.all(color: const Color(0xFFC8D8D4)),
+          borderRadius: BorderRadius.circular(8),
         ),
         child: AnimatedBuilder(
           animation: focusNode,
@@ -7511,17 +8333,17 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       floatingLabelBehavior: FloatingLabelBehavior.always,
       alignLabelWithHint: true,
-      prefixIcon: Icon(prefixIcon),
+      prefixIcon: Icon(prefixIcon, color: AppColors.primary),
       suffixIcon: suffixIcon,
       filled: true,
-      fillColor: AppColors.surfaceTint,
+      fillColor: const Color(0xFFF7FBF9),
       contentPadding: EdgeInsets.symmetric(
         horizontal: 18,
         vertical: compact ? 14 : 18,
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(18),
-        borderSide: const BorderSide(color: AppColors.secondary, width: 1.25),
+        borderSide: const BorderSide(color: Color(0xFFC8D8D4), width: 1.25),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(18),
@@ -7534,6 +8356,83 @@ class _LoginScreenState extends State<LoginScreen> {
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(18),
         borderSide: const BorderSide(color: Color(0xFFD84A4A), width: 1.5),
+      ),
+    );
+  }
+}
+
+class _LoginBackdrop extends StatelessWidget {
+  const _LoginBackdrop();
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(52)),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.primaryDark,
+                  AppColors.primary,
+                  Color(0xFF14847C),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            top: -76,
+            right: -34,
+            child: Container(
+              width: 190,
+              height: 190,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.055),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 38,
+            bottom: -64,
+            child: Container(
+              width: 145,
+              height: 145,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.accent.withValues(alpha: 0.14),
+                border: Border.all(
+                  color: AppColors.accent.withValues(alpha: 0.28),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 34,
+            bottom: 22,
+            child: Row(
+              children: List.generate(
+                4,
+                (index) => Container(
+                  width: 5,
+                  height: 5,
+                  margin: const EdgeInsets.only(left: 8),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: index == 3
+                        ? AppColors.accent
+                        : Colors.white.withValues(alpha: 0.42),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -8276,7 +9175,7 @@ class _MyAttendancePageState extends State<MyAttendancePage> {
       ),
     );
 
-    final shouldContinue = await showDialog<bool>(
+    final shouldContinue = await _showAryanDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
@@ -8687,7 +9586,7 @@ class _MyAttendancePageState extends State<MyAttendancePage> {
       return;
     }
 
-    await showDialog<void>(
+    await _showAryanDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
@@ -8710,7 +9609,7 @@ class _MyAttendancePageState extends State<MyAttendancePage> {
   ) async {
     if (kIsWeb) {
       final capturedBytes = await Navigator.of(context).push<Uint8List>(
-        MaterialPageRoute<Uint8List>(
+        _AryanPageRoute<Uint8List>(
           builder: (_) => _WebCameraCapturePage(
             title: forCheckOut ? 'Check-Out Photo' : 'Check-In Photo',
             subtitle: forCheckOut
@@ -8732,7 +9631,7 @@ class _MyAttendancePageState extends State<MyAttendancePage> {
     }
 
     final capturedFile = await Navigator.of(context).push<File>(
-      MaterialPageRoute<File>(
+      _AryanPageRoute<File>(
         builder: (_) => FrontCameraCapturePage(
           title: forCheckOut ? 'Check-Out Photo' : 'Check-In Photo',
           subtitle: forCheckOut
@@ -9534,7 +10433,7 @@ class _MyAttendancePageState extends State<MyAttendancePage> {
                           colors: [
                             AppColors.primaryDark,
                             AppColors.primary,
-                            Color(0xFF7B48D9),
+                            AppColors.accent,
                           ],
                         ),
                       ),
@@ -9944,14 +10843,37 @@ class _EmployeeIdCardPageState extends State<EmployeeIdCardPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('ID Card')),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: _submission != null
-                  ? _buildCard(_submission!)
-                  : _buildForm(),
-            ),
+      body: AnimatedSwitcher(
+        duration: MediaQuery.maybeOf(context)?.disableAnimations == true
+            ? Duration.zero
+            : _motionStandard,
+        switchInCurve: _motionEnterCurve,
+        switchOutCurve: _motionExitCurve,
+        transitionBuilder: (child, animation) => FadeTransition(
+          opacity: animation,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.025),
+              end: Offset.zero,
+            ).animate(animation),
+            child: child,
+          ),
+        ),
+        child: _loading
+            ? const Center(
+                key: ValueKey('id-card-loading'),
+                child: CircularProgressIndicator(),
+              )
+            : SingleChildScrollView(
+                key: ValueKey(
+                  _submission == null ? 'id-card-form' : 'id-card-result',
+                ),
+                padding: const EdgeInsets.all(20),
+                child: _submission != null
+                    ? _buildCard(_submission!)
+                    : _buildForm(),
+              ),
+      ),
     );
   }
 
@@ -10042,16 +10964,12 @@ class _EmployeeIdCardPageState extends State<EmployeeIdCardPage> {
           const SizedBox(height: 16),
           FilledButton(
             onPressed: _submitting ? null : _submit,
-            child: _submitting
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Text('Submit ID Card'),
+            child: _AnimatedSubmitContent(
+              isBusy: _submitting,
+              label: 'Submit ID Card',
+              busyLabel: 'Submitting...',
+              icon: Icons.badge_outlined,
+            ),
           ),
         ],
       ),
@@ -10081,7 +10999,7 @@ class _EmployeeIdCardPageState extends State<EmployeeIdCardPage> {
               padding: const EdgeInsets.fromLTRB(20, 28, 20, 72),
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Color(0xFF5B0717), Color(0xFF951A36)],
+                  colors: [AppColors.primaryDark, AppColors.primary],
                 ),
               ),
               child: Column(
@@ -10127,7 +11045,7 @@ class _EmployeeIdCardPageState extends State<EmployeeIdCardPage> {
                     card.fullName,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
-                      color: Color(0xFF5B0717),
+                      color: AppColors.primaryDark,
                       fontSize: 22,
                       fontWeight: FontWeight.w900,
                     ),
@@ -10143,7 +11061,7 @@ class _EmployeeIdCardPageState extends State<EmployeeIdCardPage> {
                       vertical: 10,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF8EDF0),
+                      color: AppColors.surfaceTint,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -10584,7 +11502,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _openIdCardPage() async {
     await Navigator.of(context).push(
-      MaterialPageRoute<void>(
+      _AryanPageRoute<void>(
         builder: (_) => EmployeeIdCardPage(
           employee: employee,
           token: token,
@@ -10655,10 +11573,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ? 'Happy Birthday!'
         : 'Happy Birthday $birthdayName!';
     final headerTextColor = isBirthdayToday
-        ? const Color(0xFF4B1F73)
+        ? AppColors.primaryDark
         : AppColors.text;
     final headerSubtleColor = isBirthdayToday
-        ? const Color(0xFF7A5670)
+        ? AppColors.subtleText
         : AppColors.subtleText;
     final shortcuts = <DashboardShortcut>[
       if (employee.canMarkAttendance)
@@ -10668,7 +11586,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           highlight: true,
           onTap: () {
             Navigator.of(context).push(
-              MaterialPageRoute<void>(
+              _AryanPageRoute<void>(
                 builder: (_) => MyAttendancePage(
                   employee: employee,
                   token: token,
@@ -10695,7 +11613,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         highlight: false,
         onTap: () {
           Navigator.of(context).push(
-            MaterialPageRoute<void>(
+            _AryanPageRoute<void>(
               builder: (_) => ReportsPage(
                 employee: employee,
                 token: token,
@@ -10712,7 +11630,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           highlight: false,
           onTap: () {
             Navigator.of(context).push(
-              MaterialPageRoute<void>(
+              _AryanPageRoute<void>(
                 builder: (_) => SalaryPage(
                   employee: employee,
                   token: token,
@@ -10730,7 +11648,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               employee.branchOpeningStatus.trim().toLowerCase() == 'not_opened',
           onTap: () {
             Navigator.of(context).push(
-              MaterialPageRoute<void>(
+              _AryanPageRoute<void>(
                 builder: (_) => BranchOpeningPage(
                   employee: employee,
                   token: token,
@@ -10747,7 +11665,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         highlight: false,
         onTap: () {
           Navigator.of(context).push(
-            MaterialPageRoute<void>(
+            _AryanPageRoute<void>(
               builder: (_) => LeaveRequestPage(
                 token: token,
                 apiClient: const EmployeeApiClient(),
@@ -10763,7 +11681,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           highlight: false,
           onTap: () {
             Navigator.of(context).push(
-              MaterialPageRoute<void>(
+              _AryanPageRoute<void>(
                 builder: (_) => SiteVisitRequestPage(
                   employee: employee,
                   token: token,
@@ -10780,7 +11698,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           highlight: false,
           onTap: () {
             Navigator.of(context).push(
-              MaterialPageRoute<void>(
+              _AryanPageRoute<void>(
                 builder: (_) => TeTrackerPage(
                   employee: employee,
                   token: token,
@@ -10800,7 +11718,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         badgeCount: unreadNotificationCount,
         onTap: () {
           Navigator.of(context).push(
-            MaterialPageRoute<void>(
+            _AryanPageRoute<void>(
               builder: (_) => NotificationsPage(
                 token: token,
                 apiClient: const EmployeeApiClient(),
@@ -10818,7 +11736,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         onTap: () {
           Navigator.of(context)
               .push<Employee>(
-                MaterialPageRoute<Employee>(
+                _AryanPageRoute<Employee>(
                   builder: (_) => ProfilePage(
                     employee: employee,
                     token: token,
@@ -10923,7 +11841,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                           ? const Color(0x33FFFFFF)
                                           : null,
                                       foregroundColor: isBirthdayToday
-                                          ? const Color(0xFF4B1F73)
+                                          ? AppColors.primaryDark
                                           : AppColors.secondary,
                                     ),
                                     icon: const Icon(Icons.logout_rounded),
@@ -10941,10 +11859,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
                                       colors: [
-                                        Color(0xFFFFB52E),
-                                        Color(0xFFFF477E),
-                                        Color(0xFF7B2CFF),
-                                        Color(0xFF3A56E8),
+                                        AppColors.accent,
+                                        AppColors.secondary,
+                                        AppColors.primary,
+                                        AppColors.primaryDark,
                                       ],
                                       stops: [0.0, 0.32, 0.7, 1.0],
                                     ),
@@ -11174,15 +12092,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             context,
                             index,
                           ) {
-                            return Padding(
-                              padding: EdgeInsets.only(
-                                bottom: index == shortcuts.length - 1 ? 0 : 14,
+                            return _MotionEntrance(
+                              delay: Duration(
+                                milliseconds: min(index * 55, 330),
                               ),
-                              child: _ShortcutCard(
-                                item: shortcuts[index],
-                                birthdayColorIndex: isBirthdayToday
-                                    ? index
-                                    : null,
+                              child: Padding(
+                                padding: EdgeInsets.only(
+                                  bottom: index == shortcuts.length - 1
+                                      ? 0
+                                      : 14,
+                                ),
+                                child: _ShortcutCard(
+                                  item: shortcuts[index],
+                                  birthdayColorIndex: isBirthdayToday
+                                      ? index
+                                      : null,
+                                ),
                               ),
                             );
                           }, childCount: shortcuts.length),
@@ -11816,7 +12741,7 @@ class _SalaryPageState extends State<SalaryPage> {
                           colors: [
                             AppColors.primaryDark,
                             AppColors.primary,
-                            Color(0xFF7B48D9),
+                            AppColors.accent,
                           ],
                         ),
                       ),
@@ -11981,20 +12906,16 @@ class _SalaryPageState extends State<SalaryPage> {
                               const SizedBox(height: 14),
                               SizedBox(
                                 width: double.infinity,
-                                child: FilledButton.icon(
+                                child: FilledButton(
                                   onPressed: _isSubmittingAdvanceRequest
                                       ? null
                                       : _submitAdvanceRequest,
-                                  icon: _isSubmittingAdvanceRequest
-                                      ? const SizedBox(
-                                          width: 18,
-                                          height: 18,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                          ),
-                                        )
-                                      : const Icon(Icons.send_rounded),
-                                  label: const Text('Submit Advance Request'),
+                                  child: _AnimatedSubmitContent(
+                                    isBusy: _isSubmittingAdvanceRequest,
+                                    label: 'Submit Advance Request',
+                                    busyLabel: 'Submitting...',
+                                    icon: Icons.send_rounded,
+                                  ),
                                 ),
                               ),
                               if (_pendingAdvanceRequestTotal > 0) ...[
@@ -12425,17 +13346,13 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
                 const SizedBox(height: 18),
                 SizedBox(
                   width: double.infinity,
-                  child: FilledButton.icon(
+                  child: FilledButton(
                     onPressed: _isSubmitting ? null : _submit,
-                    icon: _isSubmitting
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.send_rounded),
-                    label: Text(
-                      _isSubmitting ? 'Submitting...' : 'Submit Leave Request',
+                    child: _AnimatedSubmitContent(
+                      isBusy: _isSubmitting,
+                      label: 'Submit Leave Request',
+                      busyLabel: 'Submitting...',
+                      icon: Icons.send_rounded,
                     ),
                   ),
                 ),
@@ -12577,7 +13494,7 @@ class _SiteVisitRequestPageState extends State<SiteVisitRequestPage> {
     try {
       if (kIsWeb) {
         final capturedBytes = await Navigator.of(context).push<Uint8List>(
-          MaterialPageRoute<Uint8List>(
+          _AryanPageRoute<Uint8List>(
             builder: (_) => _WebCameraCapturePage(
               title: 'Site Visit Photo',
               subtitle:
@@ -12600,7 +13517,7 @@ class _SiteVisitRequestPageState extends State<SiteVisitRequestPage> {
         });
       } else {
         final image = await Navigator.of(context).push<File>(
-          MaterialPageRoute<File>(
+          _AryanPageRoute<File>(
             builder: (_) => const FrontCameraCapturePage(
               title: 'Site Visit Photo',
               subtitle:
@@ -12999,19 +13916,13 @@ class _SiteVisitRequestPageState extends State<SiteVisitRequestPage> {
                 const SizedBox(height: 18),
                 SizedBox(
                   width: double.infinity,
-                  child: FilledButton.icon(
+                  child: FilledButton(
                     onPressed: _isSubmitting ? null : _submit,
-                    icon: _isSubmitting
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.send_rounded),
-                    label: Text(
-                      _isSubmitting
-                          ? 'Submitting...'
-                          : 'Submit Site Visit Request',
+                    child: _AnimatedSubmitContent(
+                      isBusy: _isSubmitting,
+                      label: 'Submit Site Visit Request',
+                      busyLabel: 'Submitting...',
+                      icon: Icons.send_rounded,
                     ),
                   ),
                 ),
@@ -13302,7 +14213,7 @@ class _TeTrackerPageState extends State<TeTrackerPage> {
 
     try {
       final image = await Navigator.of(context).push<File>(
-        MaterialPageRoute<File>(
+        _AryanPageRoute<File>(
           builder: (_) => const FrontCameraCapturePage(
             title: 'TE Tracker Photo',
             subtitle: 'Capture the visit using the front or back camera.',
@@ -13716,21 +14627,13 @@ class _TeTrackerPageState extends State<TeTrackerPage> {
                     const SizedBox(height: 18),
                     SizedBox(
                       width: double.infinity,
-                      child: FilledButton.icon(
+                      child: FilledButton(
                         onPressed: _isSubmitting ? null : _submit,
-                        icon: _isSubmitting
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.route_rounded),
-                        label: Text(
-                          _isSubmitting
-                              ? 'Recording visit...'
-                              : 'Record TE Tracker Visit',
+                        child: _AnimatedSubmitContent(
+                          isBusy: _isSubmitting,
+                          label: 'Record TE Tracker Visit',
+                          busyLabel: 'Recording visit...',
+                          icon: Icons.route_rounded,
                         ),
                       ),
                     ),
@@ -14286,7 +15189,7 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
     if (_openingDocumentId != null || document.downloadUrl.trim().isEmpty) {
       return;
     }
-    setState(() => _openingDocumentId = document.id.toString());
+    setState(() => _openingDocumentId = document.id);
     try {
       final downloadUri = Uri.parse(
         ApiConfig.baseUrl,
@@ -14526,6 +15429,10 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
   Future<void> _pickAndUploadPhoto() async {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
+      sheetAnimationStyle: const AnimationStyle(
+        duration: _motionStandard,
+        reverseDuration: _motionFast,
+      ),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -14575,7 +15482,7 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
         imageFile = image == null ? null : File(image.path);
       } else {
         imageFile = await Navigator.of(context).push<File>(
-          MaterialPageRoute<File>(
+          _AryanPageRoute<File>(
             builder: (_) => const FrontCameraCapturePage(
               title: 'Profile Photo',
               subtitle:
@@ -14701,7 +15608,7 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
     bool obscureConfirm = true;
 
     try {
-      final result = await showDialog<Map<String, String>>(
+      final result = await _showAryanDialog<Map<String, String>>(
         context: context,
         barrierDismissible: false,
         builder: (context) {
@@ -14879,7 +15786,7 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
     final noteController = TextEditingController();
 
     try {
-      final shouldSubmit = await showDialog<bool>(
+      final shouldSubmit = await _showAryanDialog<bool>(
         context: context,
         builder: (context) {
           return AlertDialog(
@@ -14972,7 +15879,7 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
     final dialogFormKey = GlobalKey<FormState>();
 
     try {
-      await showDialog<void>(
+      await _showAryanDialog<void>(
         context: context,
         barrierDismissible: !_isSavingUanNumber,
         builder: (context) {
@@ -15127,7 +16034,7 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
     final dialogFormKey = GlobalKey<FormState>();
 
     try {
-      await showDialog<void>(
+      await _showAryanDialog<void>(
         context: context,
         barrierDismissible: !_isSavingBankDetails,
         builder: (context) {
@@ -15540,7 +16447,7 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
                     colors: [
                       AppColors.primaryDark,
                       AppColors.primary,
-                      Color(0xFF6E35D7),
+                      AppColors.accent,
                     ],
                   ),
                 ),
@@ -15999,13 +16906,18 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
                     final documents =
                         snapshot.data ?? const <EmployeeDocument>[];
                     if (documents.isEmpty) {
-                      return const _InlineInfoCard(
+                      return _InlineInfoCard(
                         backgroundColor: AppColors.surface,
                         icon: Icons.description_outlined,
                         iconColor: AppColors.primary,
-                        title: 'No documents yet',
+                        title: 'No documents available yet',
                         subtitle:
-                            'Offer letters, payslips, and employment letters will appear here when HR uploads them.',
+                            'Documents appear automatically when salary, joining date, completed attendance, or last working date details are ready.',
+                        action: TextButton.icon(
+                          onPressed: _refreshEmployeeDocuments,
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('Refresh'),
+                        ),
                       );
                     }
 
@@ -16057,8 +16969,7 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
                                 onPressed: _openingDocumentId == null
                                     ? () => _downloadEmployeeDocument(document)
                                     : null,
-                                icon:
-                                    _openingDocumentId == document.id.toString()
+                                icon: _openingDocumentId == document.id
                                     ? const SizedBox(
                                         width: 20,
                                         height: 20,
@@ -17062,6 +17973,10 @@ class _ReportsPageState extends State<ReportsPage> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      sheetAnimationStyle: const AnimationStyle(
+        duration: _motionStandard,
+        reverseDuration: _motionFast,
+      ),
       backgroundColor: Colors.transparent,
       builder: (context) {
         final theme = Theme.of(context);
@@ -19593,7 +20508,7 @@ class _InsightBanner extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFF1E7FF), Color(0xFFE4D3FF)],
+          colors: [AppColors.surfaceTint, AppColors.primarySoft],
         ),
       ),
       padding: const EdgeInsets.all(18),
@@ -19829,6 +20744,10 @@ class _SearchableSelectionField<T> extends StatelessWidget {
     await showModalBottomSheet<T>(
       context: context,
       isScrollControlled: true,
+      sheetAnimationStyle: const AnimationStyle(
+        duration: _motionStandard,
+        reverseDuration: _motionFast,
+      ),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -20010,7 +20929,7 @@ class _BirthdayBurstOverlayState extends State<_BirthdayBurstOverlay>
               phaseOffset: 0,
               rotationTurns: -0.45,
               icon: Icons.celebration_rounded,
-              color: const Color(0xFFFF477E),
+              color: AppColors.secondary,
               size: 32,
             ),
             particle(
@@ -20022,7 +20941,7 @@ class _BirthdayBurstOverlayState extends State<_BirthdayBurstOverlay>
               phaseOffset: 0.2,
               rotationTurns: 0.7,
               icon: Icons.auto_awesome,
-              color: const Color(0xFFFFB52E),
+              color: AppColors.accent,
               size: 18,
             ),
             particle(
@@ -20034,7 +20953,7 @@ class _BirthdayBurstOverlayState extends State<_BirthdayBurstOverlay>
               phaseOffset: 0.42,
               rotationTurns: -0.8,
               icon: Icons.stars_rounded,
-              color: const Color(0xFF7B2CFF),
+              color: AppColors.primary,
               size: 19,
             ),
             particle(
@@ -20046,7 +20965,7 @@ class _BirthdayBurstOverlayState extends State<_BirthdayBurstOverlay>
               phaseOffset: 0.5,
               rotationTurns: 0.45,
               icon: Icons.celebration_rounded,
-              color: const Color(0xFF7B2CFF),
+              color: AppColors.primaryDark,
               size: 32,
             ),
             particle(
@@ -20087,12 +21006,12 @@ class _ShortcutCard extends StatelessWidget {
   final int? birthdayColorIndex;
 
   static const _birthdayColors = <Color>[
-    Color(0xFFFF477E),
-    Color(0xFF7B2CFF),
-    Color(0xFFFFA51F),
-    Color(0xFF3A6FE8),
-    Color(0xFF00A878),
-    Color(0xFFE34A33),
+    AppColors.secondary,
+    AppColors.primary,
+    AppColors.accent,
+    AppColors.primaryDark,
+    AppColors.primary,
+    AppColors.secondary,
   ];
 
   @override
@@ -20102,141 +21021,148 @@ class _ShortcutCard extends StatelessWidget {
         ? null
         : _birthdayColors[birthdayColorIndex! % _birthdayColors.length];
 
-    return GestureDetector(
-      onTap: interactive ? item.onTap : null,
-      child: Container(
-        decoration: BoxDecoration(
-          color: birthdayColor == null
-              ? item.enabled
-                    ? Colors.white
-                    : const Color(0xFFF1EEF6)
-              : null,
-          gradient: birthdayColor == null
-              ? null
-              : LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    birthdayColor.withValues(alpha: 0.20),
-                    birthdayColor.withValues(alpha: 0.07),
-                    Colors.white,
+    return _PressableScale(
+      enabled: interactive,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: interactive ? item.onTap : null,
+        child: Container(
+          decoration: BoxDecoration(
+            color: birthdayColor == null
+                ? item.enabled
+                      ? Colors.white
+                      : const Color(0xFFF1EEF6)
+                : null,
+            gradient: birthdayColor == null
+                ? null
+                : LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      birthdayColor.withValues(alpha: 0.20),
+                      birthdayColor.withValues(alpha: 0.07),
+                      Colors.white,
+                    ],
+                  ),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: item.glow
+                ? const [
+                    BoxShadow(
+                      color: Color(0x55C62828),
+                      blurRadius: 28,
+                      spreadRadius: 1,
+                      offset: Offset(0, 12),
+                    ),
+                    BoxShadow(
+                      color: Color(0x24E2B94E),
+                      blurRadius: 18,
+                      spreadRadius: 2,
+                    ),
+                  ]
+                : const [
+                    BoxShadow(
+                      color: Color(0x12000000),
+                      blurRadius: 16,
+                      offset: Offset(0, 8),
+                    ),
                   ],
-                ),
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: item.glow
-              ? const [
-                  BoxShadow(
-                    color: Color(0x55C62828),
-                    blurRadius: 28,
-                    spreadRadius: 1,
-                    offset: Offset(0, 12),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+          child: Row(
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: item.enabled
+                          ? birthdayColor ??
+                                (item.highlight
+                                    ? AppColors.primarySoft
+                                    : AppColors.surfaceTint)
+                          : const Color(0xFFE7E1EE),
+                      boxShadow: item.glow
+                          ? const [
+                              BoxShadow(
+                                color: Color(0x66D4A017),
+                                blurRadius: 18,
+                                spreadRadius: 2,
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Icon(
+                      item.icon,
+                      color: item.enabled
+                          ? birthdayColor == null
+                                ? item.highlight
+                                      ? AppColors.primary
+                                      : AppColors.secondary
+                                : Colors.white
+                          : AppColors.secondary,
+                    ),
                   ),
-                  BoxShadow(
-                    color: Color(0x24E2B94E),
-                    blurRadius: 18,
-                    spreadRadius: 2,
-                  ),
-                ]
-              : const [
-                  BoxShadow(
-                    color: Color(0x12000000),
-                    blurRadius: 16,
-                    offset: Offset(0, 8),
-                  ),
-                ],
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
-        child: Row(
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: item.enabled
-                        ? birthdayColor ??
-                              (item.highlight
-                                  ? AppColors.primarySoft
-                                  : AppColors.surfaceTint)
-                        : const Color(0xFFE7E1EE),
-                    boxShadow: item.glow
-                        ? const [
-                            BoxShadow(
-                              color: Color(0x66D4A017),
-                              blurRadius: 18,
-                              spreadRadius: 2,
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: Icon(
-                    item.icon,
-                    color: item.enabled
-                        ? birthdayColor == null
-                              ? item.highlight
-                                    ? AppColors.primary
-                                    : AppColors.secondary
-                              : Colors.white
-                        : AppColors.secondary,
-                  ),
-                ),
-                if (item.badgeCount > 0)
-                  Positioned(
-                    top: -5,
-                    right: -5,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE5446D),
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                      child: Text(
-                        item.badgeCount > 99
-                            ? '99+'
-                            : item.badgeCount.toString(),
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          height: 1,
+                  if (item.badgeCount > 0)
+                    Positioned(
+                      top: -5,
+                      right: -5,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE5446D),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                        child: Text(
+                          item.badgeCount > 99
+                              ? '99+'
+                              : item.badgeCount.toString(),
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                height: 1,
+                              ),
                         ),
                       ),
                     ),
+                ],
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  item.title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: item.enabled ? AppColors.text : AppColors.secondary,
                   ),
-              ],
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Text(
-                item.title,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: item.enabled ? AppColors.text : AppColors.secondary,
                 ),
               ),
-            ),
-            if (item.enabled)
-              Icon(
-                Icons.chevron_right_rounded,
-                color:
-                    birthdayColor ??
-                    (item.highlight ? AppColors.primary : AppColors.secondary),
-              )
-            else
-              Text(
-                'Soon',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.subtleText,
-                  fontWeight: FontWeight.w700,
+              if (item.enabled)
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color:
+                      birthdayColor ??
+                      (item.highlight
+                          ? AppColors.primary
+                          : AppColors.secondary),
+                )
+              else
+                Text(
+                  'Soon',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.subtleText,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );

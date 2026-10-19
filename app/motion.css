@@ -1,0 +1,325 @@
+:root {
+  --motion-ease-out: cubic-bezier(.2, .8, .2, 1);
+  --motion-ease-spring: cubic-bezier(.2, .9, .25, 1.12);
+}
+
+/* A quiet navigation cue remains visible even when the next route needs data. */
+.route-progress {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 1000;
+  height: 3px;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.route-progress span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform: scaleX(0);
+  transform-origin: left;
+  background: linear-gradient(90deg, #c08b20, #f5d77b 52%, #006e6c);
+  box-shadow: 0 0 16px rgba(224, 177, 58, .52);
+}
+
+html[data-route-state="navigating"] .route-progress {
+  opacity: 1;
+}
+
+html[data-route-state="navigating"] .route-progress span {
+  transform: scaleX(.82);
+  transition: transform 7.5s cubic-bezier(.08, .7, .18, 1);
+}
+
+html[data-route-state="settled"] .route-progress {
+  opacity: 0;
+  transition: opacity 180ms ease 120ms;
+}
+
+html[data-route-state="settled"] .route-progress span {
+  transform: scaleX(1);
+  transition: transform 180ms ease;
+}
+
+/* React view-transition classes: the header stays planted while the route changes. */
+::view-transition {
+  pointer-events: none;
+}
+
+::view-transition-group(.route-swap) {
+  animation-duration: 340ms;
+  animation-timing-function: var(--motion-ease-out);
+}
+
+::view-transition-old(.route-swap) {
+  animation: motion-route-out 130ms ease-in both;
+}
+
+::view-transition-new(.route-swap) {
+  animation: motion-route-in 320ms var(--motion-ease-out) 45ms both;
+}
+
+@keyframes motion-route-out {
+  to { opacity: 0; transform: translateY(-5px); filter: blur(2px); }
+}
+
+@keyframes motion-route-in {
+  from { opacity: 0; transform: translateY(12px); filter: blur(3px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+
+/* First-paint choreography for the most important screens. */
+.hero-content > *,
+.contact-hero > *,
+.login-hub-hero > div > *,
+.login-card > *,
+.branch-login-form > form,
+.ho-login-card,
+.accounts-login-form > form {
+  animation: motion-rise-in 620ms var(--motion-ease-out) both;
+}
+
+.hero-content > :nth-child(1), .contact-hero > :nth-child(1) { animation-delay: 50ms; }
+.hero-content > :nth-child(2), .contact-hero > :nth-child(2) { animation-delay: 110ms; }
+.hero-content > :nth-child(3), .contact-hero > :nth-child(3) { animation-delay: 170ms; }
+.hero-content > :nth-child(4) { animation-delay: 230ms; }
+.hero-content > :nth-child(5) { animation-delay: 290ms; }
+.hero-art { animation: motion-hero-in 900ms var(--motion-ease-out) 130ms both; }
+
+@keyframes motion-rise-in {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes motion-hero-in {
+  from { opacity: 0; transform: translateX(22px) scale(.97); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Form submissions keep their context while clearly communicating progress. */
+form.motion-submitting {
+  cursor: progress;
+}
+
+form.motion-submitting :is(input, textarea, select) {
+  transition: opacity 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+form.motion-submitting button:disabled,
+form.motion-submitting input[type="submit"]:disabled {
+  position: relative;
+  overflow: hidden;
+  cursor: progress;
+  opacity: .76;
+  transform: translateY(1px) scale(.99);
+}
+
+form.motion-submitting button:disabled::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 20%, rgba(255, 255, 255, .3) 45%, transparent 70%);
+  transform: translateX(-115%);
+  animation: motion-submit-sheen 1.05s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes motion-submit-sheen {
+  to { transform: translateX(115%); }
+}
+
+.motion-invalid {
+  animation: motion-field-shake 380ms ease both;
+}
+
+@keyframes motion-field-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  50% { transform: translateX(4px); }
+  75% { transform: translateX(-2px); }
+}
+
+:is([role="status"], [role="alert"], .form-success, .ops-notice, .accounts-notice, .ho-notice, .chat-toast) {
+  animation: motion-notice-in 360ms var(--motion-ease-spring) both;
+}
+
+:is(.form-error, .field-error, .password-form-error, .integration-error, .chat-error, .import-errors) {
+  animation: motion-error-in 280ms var(--motion-ease-out) both;
+}
+
+@keyframes motion-notice-in {
+  from { opacity: 0; transform: translateY(-8px) scale(.985); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes motion-error-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Menus, fresh rows, and chat messages arrive without making the UI feel busy. */
+.mobile-nav {
+  transform-origin: top;
+  animation: motion-menu-in 220ms var(--motion-ease-out) both;
+}
+
+:is(.responsive-table tbody tr, .ops-list > article, .accounts-payment, .ho-packet, .gatti-item, .chat-messages article) {
+  animation: motion-item-in 300ms var(--motion-ease-out) both;
+}
+
+:is(.responsive-table tbody tr, .ops-list > article, .accounts-payment, .ho-packet, .gatti-item):nth-child(2) { animation-delay: 30ms; }
+:is(.responsive-table tbody tr, .ops-list > article, .accounts-payment, .ho-packet, .gatti-item):nth-child(3) { animation-delay: 55ms; }
+:is(.responsive-table tbody tr, .ops-list > article, .accounts-payment, .ho-packet, .gatti-item):nth-child(4) { animation-delay: 75ms; }
+
+@keyframes motion-menu-in {
+  from { opacity: 0; transform: translateY(-7px) scaleY(.97); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes motion-item-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Card and control movement is small, consistent, and GPU-friendly. */
+:is(.panel, .branch-card, .contact-cards article, .login-portal-card, .login-app-download-card, .accounts-panel, .ho-panel) {
+  transition: transform 240ms var(--motion-ease-out), box-shadow 240ms ease, border-color 240ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :is(.branch-card, .contact-cards article, .login-portal-card, .login-app-download-card):hover {
+    transform: translateY(-5px);
+  }
+
+  :is(button, [role="button"], .gold-button, .admin-primary, .admin-secondary):active:not(:disabled) {
+    transform: translateY(1px) scale(.985);
+    transition-duration: 80ms;
+  }
+}
+
+/* Progressive scroll reveals; unsupported browsers simply show the content. */
+@supports (animation-timeline: view()) {
+  :is(
+    .collection-intro,
+    .collection-card,
+    .service-grid > article,
+    .branches-heading,
+    .branch-card,
+    .process-journey,
+    .trust-section > *,
+    .contact-cards > article,
+    .contact-content > aside,
+    .location-section
+  ) {
+    animation: motion-scroll-reveal linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 28%;
+  }
+}
+
+@keyframes motion-scroll-reveal {
+  from { opacity: .08; transform: translateY(26px) scale(.985); }
+  to { opacity: 1; transform: none; }
+}
+
+.route-loading {
+  min-height: min(68vh, 720px);
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 18px;
+  color: var(--aryan-teal-dark, #004d50);
+  background: linear-gradient(145deg, #fffdf8, #f4faf7);
+}
+
+.route-loading-mark {
+  position: relative;
+  width: 62px;
+  height: 62px;
+  border: 2px solid rgba(0, 78, 80, .13);
+  border-top-color: var(--aryan-gold, #e0b13a);
+  border-radius: 50%;
+  animation: motion-loader-spin .9s linear infinite;
+}
+
+.route-loading-mark::after {
+  content: "AG";
+  position: absolute;
+  inset: 7px;
+  display: grid;
+  place-items: center;
+  border-radius: inherit;
+  background: var(--aryan-teal-dark, #004d50);
+  color: #fff8ec;
+  font: 700 17px/1 var(--font-serif);
+  animation: motion-loader-counter-spin .9s linear infinite;
+}
+
+.route-loading p {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+@keyframes motion-loader-spin { to { transform: rotate(360deg); } }
+@keyframes motion-loader-counter-spin { to { transform: rotate(-360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+  }
+
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+
+  .hero-content > *,
+  .contact-hero > *,
+  .login-hub-hero > div > *,
+  .login-card > *,
+  .branch-login-form > form,
+  .ho-login-card,
+  .accounts-login-form > form,
+  .hero-art,
+  form.motion-submitting button:disabled::after,
+  .route-loading-mark,
+  .route-loading-mark::after,
+  .mobile-nav,
+  :is(.responsive-table tbody tr, .ops-list > article, .accounts-payment, .ho-packet, .gatti-item, .chat-messages article),
+  :is(.form-error, .field-error, .password-form-error, .integration-error, .chat-error, .import-errors),
+  :is([role="status"], [role="alert"], .form-success, .ops-notice, .accounts-notice, .ho-notice, .chat-toast) {
+    animation: none !important;
+  }
+
+  @supports (animation-timeline: view()) {
+    :is(
+      .collection-intro,
+      .collection-card,
+      .service-grid > article,
+      .branches-heading,
+      .branch-card,
+      .process-journey,
+      .trust-section > *,
+      .contact-cards > article,
+      .contact-content > aside,
+      .location-section
+    ) {
+      animation: none !important;
+    }
+  }
+}
+
+@media print {
+  .route-progress { display: none !important; }
+  * { animation: none !important; transition: none !important; }
+}

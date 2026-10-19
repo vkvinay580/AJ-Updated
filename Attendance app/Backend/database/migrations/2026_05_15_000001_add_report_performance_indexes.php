@@ -29,9 +29,9 @@ return new class extends Migration
         ['employee', ['is_night_shift', 'empId'], 'employee_night_shift_emp_idx'],
         ['employee', ['last_login_branch_id'], 'employee_last_login_branch_idx'],
 
-        ['employeeDetails', ['employeeId', 'id'], 'employee_details_emp_id_latest_idx'],
-        ['employeeDetails', ['branchId', 'status'], 'employee_details_branch_status_idx'],
-        ['employeeDetails', ['accountVerified', 'employeeId'], 'employee_details_verified_emp_idx'],
+        ['employeedetails', ['employeeId', 'id'], 'employee_details_emp_id_latest_idx'],
+        ['employeedetails', ['branchId', 'status'], 'employee_details_branch_status_idx'],
+        ['employeedetails', ['accountVerified', 'employeeId'], 'employee_details_verified_emp_idx'],
 
         ['employee_advance_transactions', ['employee_id', 'advance_date', 'id'], 'emp_adv_employee_date_id_idx'],
         ['employee_advance_transactions', ['advance_date', 'employee_id'], 'emp_adv_date_employee_idx'],
