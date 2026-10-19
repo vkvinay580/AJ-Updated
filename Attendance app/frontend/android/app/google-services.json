@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "496217963883",
+    "project_id": "aryan-80155",
+    "storage_bucket": "aryan-80155.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:496217963883:android:2e9b2e39ad857629d5a02e",
+        "android_client_info": {
+          "package_name": "aryan.attendance"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCxMmc19qYqZywSlap7ikFq6raDiWhWlVc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:496217963883:android:8debe1bd10b84ac4d5a02e",
+        "android_client_info": {
+          "package_name": "in.aryangold.aryan_verification"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCxMmc19qYqZywSlap7ikFq6raDiWhWlVc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -49,7 +49,10 @@ void main() {
 
     expect(ApiConfig.baseUrl, ApiConfig.resolvedDefaultBaseUrl);
     final preferences = await SharedPreferences.getInstance();
-    expect(preferences.getString('api_base_url_v4'), ApiConfig.resolvedDefaultBaseUrl);
+    expect(
+      preferences.getString('api_base_url_v4'),
+      ApiConfig.resolvedDefaultBaseUrl,
+    );
     expect(preferences.containsKey('api_base_url_v3'), isFalse);
     expect(preferences.containsKey('api_base_url_v2'), isFalse);
   });
@@ -71,17 +74,37 @@ void main() {
   });
 
   test(
-    'default build leaves Firebase push disabled without platform setup',
+    'Firebase push is enabled by default and remains safe off mobile',
     () async {
-      const enabled = bool.fromEnvironment('ENABLE_FIREBASE_PUSH');
+      const enabled = bool.fromEnvironment(
+        'ENABLE_FIREBASE_PUSH',
+        defaultValue: true,
+      );
       expect(PushMessagingService.enabled, enabled);
 
-      if (!enabled) {
-        await PushMessagingService.ensureFirebaseInitialized();
-        await PushMessagingService.initialize();
-        expect(PushMessagingService.isAvailable, isFalse);
-        expect(await PushMessagingService.currentToken(), isNull);
-      }
+      await PushMessagingService.initialize();
+      expect(PushMessagingService.isAvailable, isFalse);
+      expect(await PushMessagingService.currentToken(), isNull);
+    },
+  );
+
+  test(
+    'Firebase and polling share notification delivery deduplication',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+
+      expect(
+        await AttendanceNotificationService.claimAdminNotificationDisplay(42),
+        isTrue,
+      );
+      expect(
+        await AttendanceNotificationService.claimAdminNotificationDisplay(42),
+        isFalse,
+      );
+      expect(
+        await AttendanceNotificationService.claimAdminNotificationDisplay(0),
+        isFalse,
+      );
     },
   );
 }

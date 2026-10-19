@@ -133,6 +133,16 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     return;
   }
 
+  // Android renders notification payloads itself while the app is in the
+  // background. Record that display so the polling fallback cannot alert for
+  // the same delivery again after the app resumes.
+  if (message.notification != null) {
+    await AttendanceNotificationService.claimAdminNotificationDisplay(
+      notification.deliveryId,
+    );
+    return;
+  }
+
   await AttendanceNotificationService.showAdminNotification(notification);
 }
 
@@ -616,7 +626,7 @@ class AttendanceNotificationService {
 
     await _ensureInitializedForNotificationWork();
 
-    final wasMarkedAsShown = await _markAdminNotificationAsShown(
+    final wasMarkedAsShown = await claimAdminNotificationDisplay(
       notification.deliveryId,
     );
     if (!wasMarkedAsShown) {
@@ -631,6 +641,14 @@ class AttendanceNotificationService {
       body: notification.body,
       notificationDetails: _adminNotificationDetails,
     );
+  }
+
+  static Future<bool> claimAdminNotificationDisplay(int deliveryId) async {
+    if (deliveryId <= 0) {
+      return false;
+    }
+
+    return _markAdminNotificationAsShown(deliveryId);
   }
 
   static Future<void> markCheckInCompleted() async {
@@ -1045,7 +1063,7 @@ class PushMessagingService {
 
   static const enabled = bool.fromEnvironment(
     'ENABLE_FIREBASE_PUSH',
-    defaultValue: false,
+    defaultValue: true,
   );
 
   static Future<void>? _initialization;

@@ -2,7 +2,7 @@
 
 Open `http://127.0.0.1:8000/` for the Aryan Gold employee web application and `http://127.0.0.1:8000/admin/login` for administrator sign-in.
 
-Use an existing authorized account from the imported backup or the local accounts supplied in chat. The local database is separate from existing XAMPP databases. The current Android and web release is version 5.0.40 (5041), branded for Aryan Gold. The full upstream user guide is retained in `UPSTREAM_USER_GUIDE.md`.
+Use an existing authorized account from the imported backup or the local accounts supplied in chat. The local database is separate from existing XAMPP databases. The current Android release is version 5.0.41 (5042), while the hosted web release remains 5.0.40 (5041). Both are branded for Aryan Gold. The full upstream user guide is retained in `UPSTREAM_USER_GUIDE.md`.
 
 The production app connects to `https://attendance.aryangold.in/api` by default. Local employee web and Android builds connect to the local API only when the developer builds them with the documented `API_BASE_URL` override. Release Android builds reject cleartext HTTP; debug builds retain HTTP support for local development.
 
@@ -12,7 +12,13 @@ The employee web sign-in screen fills the available browser height while keeping
 
 Attendance forms now use consistent high-contrast fields, focus borders, and full-height action buttons. On the My Attendance page, the employee name, branch name, employee ID, and branch ID are shown on separate aligned lines so long names remain readable. Desktop web dashboards can be scrolled normally and display a standard scrollbar when content extends below the window.
 
-Version 5.0.40 (5041) is available from the Attendance download link on the Aryan Gold staff login page as Android package `aryan.attendance`. It adds cohesive motion across page navigation, sign-in and dashboard state changes, dialogs, selection sheets, dashboard shortcuts, form submissions, and loading-to-result changes while retaining the full-viewport Aryan Gold splash. Motion remains restrained and follows the device or browser reduced-motion preference. The direct-download APK uses the same signing certificate as version 5.0.37, so it can update that directly distributed build in place.
+Version 5.0.41 (5042) is available from the Attendance download link on the Aryan Gold staff login page as Android package `aryan.attendance`. It enables Firebase notifications while retaining the cohesive motion and full-viewport Aryan Gold splash from 5.0.40. The direct-download APK uses the same signing certificate as version 5.0.37, so it can update that directly distributed build in place.
+
+## Firebase attendance notifications
+
+The Android app asks for notification permission and registers the signed-in employee's device with the Attendance server. Administrators can send notices from **Admin > Notifications**, and workflow events such as leave decisions, attendance regularization, branch-opening assignments, work visits, and bank-detail requests can also alert the affected employee. Notifications appear while the app is open, in the background, or after it is reopened; the in-app notification list remains the fallback when delivery is delayed or notification permission is denied.
+
+Allow notifications when Android prompts. If alerts do not appear, open Android **Settings > Apps > Aryan Gold Attendance > Notifications**, enable **Admin notifications**, confirm that Google Play services and internet access are available, then sign out and sign in again to refresh the device registration. The app never displays two alerts for the same background Firebase message.
 
 The launch screen introduces the employee workspace with a short staged Aryan Gold animation and loading indicator. The sign-in page uses the light cream, teal and gold theme with a clearer secure-login panel. Page changes use subtle fade-and-slide motion. Devices and browsers configured to reduce animation receive a shortened static launch and transition experience.
 
@@ -61,6 +67,7 @@ Branch-portal sign-in now explains the exact corrective action: an employee with
 
 ## Documentation change log
 
+- 2026-10-19: Registered the Attendance Android package with Firebase, enabled authenticated employee push notifications by default, prevented duplicate background alerts, and released Android version 5.0.41 (5042).
 - 2026-10-19: Replaced free-form hiring and joining location choices with a required dropdown of currently active Aryan Gold branches and carried the hiring preference into joining.
 - 2026-10-16: Added a shared motion system for page navigation, authentication and dashboard state changes, dialogs, bottom sheets, staggered shortcut entrances, press feedback, submission controls, and loading-to-result changes; preserved reduced-motion behavior and released Android and web version 5.0.40 (5041).
 - 2026-10-16: Redesigned the Aryan Gold launch experience with premium teal-and-gold motion, responsive concentric brand rings, a secure-workspace progress treatment, and a full-viewport web boot splash; released Android and web version 5.0.39 (5040).
