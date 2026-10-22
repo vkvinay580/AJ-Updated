@@ -6,6 +6,10 @@ if (is_file($helpersPath)) {
     require_once $helpersPath;
 }
 
+// Laravel normally reads .env after this file returns. Vault connection metadata
+// must be available first so the secret loader can fail closed before config boots.
+Dotenv\Dotenv::createImmutable(dirname(__DIR__))->safeLoad();
+App\Support\VaultEnvironment::load();
 
 
 $app = new Illuminate\Foundation\Application(

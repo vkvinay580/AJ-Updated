@@ -3,10 +3,12 @@ import { mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import dotenv from "dotenv";
 import mysql from "mysql2/promise";
+import vaultEnvironment from "../lib/vault-env.cjs";
 
 dotenv.config({ path: path.join(process.cwd(), ".env.local") });
 dotenv.config({ path: path.join(process.cwd(), ".env.production") });
 dotenv.config();
+await vaultEnvironment.loadVaultEnv({ application: "business" });
 
 const required = ["DB_HOST", "DB_USER", "DB_PASSWORD", "DB_NAME", "DATA_ENCRYPTION_KEY", "INITIAL_ADMIN_EMAIL", "INITIAL_ADMIN_PASSWORD"];
 const missing = required.filter((name) => !process.env[name]);
@@ -33,6 +35,22 @@ const connection = await mysql.createConnection({
 try {
   const schema = readFileSync(path.join(process.cwd(), "database", "schema.sql"), "utf8");
   await connection.query(schema);
+  const [existingBusinessSettingColumns] = await connection.query("SHOW COLUMNS FROM business_settings");
+  const businessSettingColumnNames = new Set(existingBusinessSettingColumns.map((column) => column.Field));
+  const purityRateColumns = [
+    ["sale_rate_999_paise_per_gram", "sale_rate_paise_per_gram", 999],
+    ["purchase_rate_999_paise_per_gram", "purchase_rate_paise_per_gram", 999],
+    ["sale_rate_916_paise_per_gram", "sale_rate_paise_per_gram", 916],
+    ["purchase_rate_916_paise_per_gram", "purchase_rate_paise_per_gram", 916],
+    ["sale_rate_750_paise_per_gram", "sale_rate_paise_per_gram", 750],
+    ["purchase_rate_750_paise_per_gram", "purchase_rate_paise_per_gram", 750],
+  ];
+  for (const [name] of purityRateColumns) {
+    if (!businessSettingColumnNames.has(name)) await connection.query(`ALTER TABLE business_settings ADD COLUMN ${name} BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER purchase_rate_paise_per_gram`);
+  }
+  for (const [name, legacyName, purity] of purityRateColumns) {
+    await connection.query(`UPDATE business_settings SET ${name}=ROUND(${legacyName} * ? / 999) WHERE ${name}=0`, [purity]);
+  }
   const [existingHeadOfficeColumns] = await connection.query("SHOW COLUMNS FROM head_office_users");
   await connection.query("ALTER TABLE head_office_users MODIFY COLUMN role ENUM('auditor','melter','floor') NOT NULL");
   if (!existingHeadOfficeColumns.some((column) => column.Field === "operations_admin_id")) {
@@ -162,7 +180,7 @@ try {
   }
 
   const companies = [
-    ["aryan-gold", "Aryan Gold", "AG", "/brands/aryan-gold.png", "AG"],
+    ["aryan-gold", "Aryan Gold", "AG", "/brands/aryan-gold.webp", "AG"],
     ["aryan-jewels", "Aryan Jewels", "AJ", "/brands/aryan-jewels.png", "AJ"],
     ["lakshmi-bullion", "Lakshmi Bullion", "LB", "/brands/lakshmi-bullion-gold.png", "LB"],
   ];

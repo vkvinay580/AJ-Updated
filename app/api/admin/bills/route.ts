@@ -7,6 +7,7 @@ import { apiError, cleanText, requestIp } from "@/lib/api";
 import { addFundEntry, lockFundLedger } from "@/lib/branch-ledger";
 import { businessAuthenticated } from "@/lib/business-actor";
 import { encryptSensitive, execute, one, rows, transaction } from "@/lib/db";
+import { goldPurityCode } from "@/lib/gold-rates";
 
 type ItemInput = { metal?: unknown; description?: unknown; itemDescription?: unknown; hsnCode?: unknown; purity?: unknown; grossWeightGrams?: unknown; stoneWeightGrams?: unknown; netWeightGrams?: unknown; weightGrams?: unknown; ratePerGram?: unknown; making?: unknown };
 type PaymentInput = { method?: unknown; amount?: unknown; accountNumber?: unknown; ifscCode?: unknown; upiId?: unknown; chequeNumber?: unknown; cardNumber?: unknown };
@@ -91,7 +92,6 @@ export async function POST(request: NextRequest) {
   if (normalizedPayments.some(payment => payment.method === "cheque" && !/^[A-Za-z0-9/-]{1,20}$/.test(payment.chequeNumber))) return apiError("Enter a valid cheque number for each cheque payment.");
   if (normalizedPayments.some(payment => payment.method === "card" && !/^\d{12,19}$/.test(payment.cardNumber))) return apiError("Enter a valid card number for each card payment.");
 
-  const branchRates = session.branchId ? await one<RowDataPacket>("SELECT purchase_rate_paise_per_gram AS purchaseRate,sale_rate_paise_per_gram AS saleRate FROM business_settings WHERE id=1") : null;
   const normalized = items.map((item) => {
     const description = cleanText(item.description, 150);
     const grossWeightGrams = Number(item.grossWeightGrams ?? item.netWeightGrams ?? item.weightGrams);
@@ -99,11 +99,14 @@ export async function POST(request: NextRequest) {
     const netWeightGrams = grossWeightGrams - stoneWeightGrams;
     const weightMg = Math.round(netWeightGrams * 1000), grossWeightMg = Math.round(grossWeightGrams * 1000), stoneWeightMg = Math.round(stoneWeightGrams * 1000);
     const metal = item.metal === "silver" || /silver/i.test(description) ? "silver" : "gold";
-    const ratePaise = branchRates && metal === "gold" ? Number(transactionType === "purchase" ? branchRates.purchaseRate : branchRates.saleRate) : toPaise(item.ratePerGram);
+    const purity = cleanText(item.purity, 20);
+    const purityCode = metal === "gold" ? goldPurityCode(purity) : null;
+    const ratePaise = toPaise(item.ratePerGram);
     const makingPaise = toPaise(item.making || 0);
     const amountPaise = Math.round(netWeightGrams * ratePaise + makingPaise);
-    return { metal, description, itemDescription: cleanText(item.itemDescription, 190), hsnCode: cleanText(item.hsnCode, 20), purity: cleanText(item.purity, 20), grossWeightMg, stoneWeightMg, weightMg, ratePaise, makingPaise, amountPaise };
+    return { metal, description, itemDescription: cleanText(item.itemDescription, 190), hsnCode: cleanText(item.hsnCode, 20), purity, purityCode, grossWeightMg, stoneWeightMg, weightMg, ratePaise, makingPaise, amountPaise };
   });
+  if (normalized.some((item) => item.metal === "gold" && !item.purityCode)) return apiError("Choose 24K / 999, 22K / 916, or 18K / 750 for every gold item.");
   if (normalized.some((item) => !item.description || !/^\d{4,8}$/.test(item.hsnCode) || item.weightMg <= 0 || item.stoneWeightMg < 0 || item.grossWeightMg !== item.weightMg + item.stoneWeightMg || item.ratePaise <= 0 || !Number.isFinite(item.amountPaise))) return apiError("Check the description, HSN/SAC, gross weight, stone weight and rate for every item. Stone weight must be below gross weight.");
   if (![cgstRate, sgstRate].every((rate) => Number.isFinite(rate) && rate >= 0 && rate <= 50)) return apiError("Invalid CGST or SGST/UTGST rate.");
   const subtotalPaise = normalized.reduce((sum, item) => sum + item.amountPaise, 0);

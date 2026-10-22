@@ -12,21 +12,31 @@ const toPaise = (value: unknown) => Math.round(Number(value) * 100);
 export async function GET(request: NextRequest) {
   const auth = await authenticatedForOperations(request);
   if (auth.error || !auth.access) return auth.error;
+  const access = auth.access;
   let directory = null;
   let integrationError = "";
   try { directory = await getAttendanceDirectory(); }
   catch (error) { integrationError = error instanceof Error ? error.message : "Attendance service is unavailable."; }
 
   const [settings, transactions, funds, expenses, closings, goldTransfers, fundLedger, stockLedger, balances] = await Promise.all([
-    one<RowDataPacket>("SELECT sale_rate_paise_per_gram AS saleRate,purchase_rate_paise_per_gram AS purchaseRate,updated_at AS updatedAt FROM business_settings WHERE id=1"),
+    one<RowDataPacket>(`SELECT
+      sale_rate_999_paise_per_gram AS saleRate999,purchase_rate_999_paise_per_gram AS purchaseRate999,
+      sale_rate_916_paise_per_gram AS saleRate916,purchase_rate_916_paise_per_gram AS purchaseRate916,
+      sale_rate_750_paise_per_gram AS saleRate750,purchase_rate_750_paise_per_gram AS purchaseRate750,
+      updated_at AS updatedAt FROM business_settings WHERE id=1`),
     rows<RowDataPacket>(`SELECT t.id,t.bill_id AS billId,t.branch_id AS branchId,t.transaction_type AS type,t.business_mode AS businessMode,
       t.gold_weight_mg AS weightMg,t.rate_paise_per_gram AS ratePaise,t.amount_paise AS amountPaise,
       t.pledge_amount_paise AS pledgeAmountPaise,t.pledge_status AS pledgeStatus,b.release_place AS releasePlace,b.release_amount_paise AS releaseAmountPaise,
       COALESCE((SELECT SUM(bp.amount_paise) FROM bill_payments bp WHERE bp.bill_id=b.id AND bp.payment_method='cash'),CASE WHEN b.payment_method='cash' THEN t.amount_paise ELSE 0 END) AS cashPaymentPaise,
       COALESCE((SELECT SUM(bp.amount_paise) FROM bill_payments bp WHERE bp.bill_id=b.id AND bp.payment_method IN ('upi','bank_transfer')),CASE WHEN b.payment_method IN ('upi','bank_transfer') THEN t.amount_paise ELSE 0 END) AS onlinePaymentPaise,
       (t.pledge_document_path IS NOT NULL OR EXISTS(SELECT 1 FROM branch_pledge_documents d WHERE d.transaction_id=t.id)) AS hasPledgeDocument,t.status,t.notes,t.created_by_employee_id AS employeeId,
-      t.created_at AS createdAt,c.name AS customerName,c.phone AS customerPhone FROM branch_transactions t
-      JOIN branch_customers c ON c.id=t.customer_id LEFT JOIN bills b ON b.id=t.bill_id ORDER BY t.id DESC LIMIT 250`),
+      t.created_at AS createdAt,c.name AS customerName,c.phone AS customerPhone,
+      vr.id AS verificationRequestId,vr.status AS verificationStatus,vr.completed_at AS verificationCompletedAt,vv.viewed_at AS verificationViewedAt
+      FROM branch_transactions t JOIN branch_customers c ON c.id=t.customer_id LEFT JOIN bills b ON b.id=t.bill_id
+      LEFT JOIN customer_verification_requests vr ON vr.id=(SELECT vr2.id FROM customer_verification_requests vr2
+        WHERE vr2.customer_id=b.customer_id AND vr2.company_id=b.company_id ORDER BY vr2.id DESC LIMIT 1)
+      LEFT JOIN verification_result_views vv ON vv.request_id=vr.id AND vv.viewer_role=? AND vv.viewer_key=?
+      ORDER BY t.id DESC LIMIT 250`, [access.mode, String(access.session.adminId)]),
     rows<RowDataPacket>(`SELECT id,branch_id AS branchId,requested_amount_paise AS requestedPaise,approved_amount_paise AS approvedPaise,
       purpose,status,created_by_employee_id AS employeeId,admin_notes AS adminNotes,created_at AS createdAt FROM fund_requests ORDER BY id DESC LIMIT 250`),
     rows<RowDataPacket>(`SELECT id,branch_id AS branchId,DATE_FORMAT(expense_date,'%Y-%m-%d') AS expenseDate,category,amount_paise AS amountPaise,
@@ -50,7 +60,7 @@ export async function GET(request: NextRequest) {
       FROM (SELECT branch_id AS branchId FROM branch_transactions UNION SELECT branch_id FROM branch_fund_ledger UNION SELECT branch_id FROM branch_stock_ledger) b
       ORDER BY b.branchId`),
   ]);
-  return NextResponse.json({ directory, integrationError, settings, transactions, funds, expenses, closings,
+  return NextResponse.json({ accessMode: access.mode, directory, integrationError, settings, transactions, funds, expenses, closings,
     goldTransfers, fundLedger, stockLedger, balances });
 }
 
@@ -62,10 +72,17 @@ export async function PATCH(request: NextRequest) {
   const action = cleanText(body.action, 40);
 
   if (action === "rates") {
-    const sale = toPaise(body.saleRate);
-    const purchase = toPaise(body.purchaseRate);
-    if (!Number.isFinite(sale) || sale <= 0 || !Number.isFinite(purchase) || purchase <= 0) return apiError("Enter valid positive sale and purchase rates.");
-    await execute("UPDATE business_settings SET sale_rate_paise_per_gram=?,purchase_rate_paise_per_gram=?,updated_by=? WHERE id=1", [sale, purchase, session.adminId]);
+    const sale999 = toPaise(body.saleRate999), purchase999 = toPaise(body.purchaseRate999);
+    const sale916 = toPaise(body.saleRate916), purchase916 = toPaise(body.purchaseRate916);
+    const sale750 = toPaise(body.saleRate750), purchase750 = toPaise(body.purchaseRate750);
+    const rates = [sale999, purchase999, sale916, purchase916, sale750, purchase750];
+    if (rates.some(rate => !Number.isFinite(rate) || rate <= 0)) return apiError("Enter valid positive buy and sell rates for all three gold purities.");
+    await execute(`UPDATE business_settings SET
+      sale_rate_paise_per_gram=?,purchase_rate_paise_per_gram=?,
+      sale_rate_999_paise_per_gram=?,purchase_rate_999_paise_per_gram=?,
+      sale_rate_916_paise_per_gram=?,purchase_rate_916_paise_per_gram=?,
+      sale_rate_750_paise_per_gram=?,purchase_rate_750_paise_per_gram=?,updated_by=? WHERE id=1`,
+      [sale999, purchase999, sale999, purchase999, sale916, purchase916, sale750, purchase750, session.adminId]);
     await logAudit(session, "business_rates_updated", "business_settings", 1);
     return NextResponse.json({ ok: true, message: "Daily rates updated everywhere." });
   }
@@ -92,6 +109,7 @@ export async function PATCH(request: NextRequest) {
   try {
     if (action === "transaction") {
       if (!["billed", "rejected"].includes(status)) return apiError("Choose billed or rejected.");
+      if (status === "billed" && auth.access.mode !== "floor") return apiError("Only a floor user can approve branch business.", 403);
       await transaction(async (connection) => {
         const item = await one<RowDataPacket>(`SELECT t.id,t.branch_id AS branchId,t.transaction_type AS type,t.business_mode AS businessMode,
           t.gold_weight_mg AS weightMg,t.amount_paise AS amountPaise,t.pledge_amount_paise AS pledgeAmountPaise,t.pledge_status AS pledgeStatus,
@@ -99,11 +117,18 @@ export async function PATCH(request: NextRequest) {
           COALESCE((SELECT SUM(bp.amount_paise) FROM bill_payments bp WHERE bp.bill_id=b.id AND bp.payment_method='cash'),
             CASE WHEN b.payment_method='cash' THEN t.amount_paise ELSE 0 END) AS cashPaymentPaise,
           EXISTS(SELECT 1 FROM branch_fund_ledger f WHERE f.entry_type='purchase_submitted' AND f.reference_id=t.id AND f.direction='debit') AS cashReserved,
-          COALESCE(b.release_amount_paise,t.pledge_amount_paise) AS releaseAmountPaise
-          FROM branch_transactions t LEFT JOIN bills b ON b.id=t.bill_id WHERE t.id=? AND t.status IN ('submitted','transit') FOR UPDATE`, [id], connection);
+          COALESCE(b.release_amount_paise,t.pledge_amount_paise) AS releaseAmountPaise,
+          vr.id AS verificationRequestId,vr.status AS verificationStatus,
+          EXISTS(SELECT 1 FROM verification_result_views vv WHERE vv.request_id=vr.id AND vv.viewer_role=? AND vv.viewer_key=?) AS verificationViewed
+          FROM branch_transactions t LEFT JOIN bills b ON b.id=t.bill_id
+          LEFT JOIN customer_verification_requests vr ON vr.id=(SELECT vr2.id FROM customer_verification_requests vr2
+            WHERE vr2.customer_id=b.customer_id AND vr2.company_id=b.company_id ORDER BY vr2.id DESC LIMIT 1)
+          WHERE t.id=? AND t.status IN ('submitted','transit') FOR UPDATE`, [auth.access.mode, String(session.adminId), id], connection);
         if (!item) throw new Error("ALREADY_REVIEWED");
         const branchId = String(item.branchId);
         if (status === "billed") {
+          if (item.verificationRequestId && !["verified", "could_not_verify"].includes(String(item.verificationStatus))) throw new Error("VERIFICATION_PENDING");
+          if (item.verificationRequestId && !Number(item.verificationViewed)) throw new Error("VERIFICATION_NOT_VIEWED");
           if (item.type === "purchase") {
             if (Number(item.cashPaymentPaise) > 0 && !Number(item.cashReserved)) {
               if (await lockFundLedger(branchId, connection) < Number(item.cashPaymentPaise)) throw new Error("INSUFFICIENT_FUNDS");
@@ -171,6 +196,8 @@ export async function PATCH(request: NextRequest) {
     if (message.includes("ALREADY_REVIEWED")) return apiError("This record has already been reviewed.", 409);
     if (message.includes("INSUFFICIENT_FUNDS")) return apiError("The branch does not have enough available funds for this approval.", 409);
     if (message.includes("INSUFFICIENT_STOCK")) return apiError("The branch does not have enough available gold stock for this approval.", 409);
+    if (message.includes("VERIFICATION_PENDING")) return apiError("Verification was requested for this customer. Wait for the TE result before approval.", 409);
+    if (message.includes("VERIFICATION_NOT_VIEWED")) return apiError("Open and review the verification details before approval.", 409);
     throw error;
   }
 

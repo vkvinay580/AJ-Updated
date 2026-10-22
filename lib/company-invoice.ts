@@ -1,5 +1,6 @@
 export type CompanyInvoiceProfile = {
   gstin: string;
+  pan?: string;
   address: string;
   state: string;
   stateCode: string;
@@ -7,7 +8,8 @@ export type CompanyInvoiceProfile = {
 };
 
 const aryanProfile: CompanyInvoiceProfile = {
-  gstin: "29BHOPS5661M1ZA",
+  gstin: "29ABGCA9333E1ZK",
+  pan: "ABGCA9333E",
   address: "1st Floor, Shop No. 5, No. 126, Laxmi Golden Mall, Sri Dharmaraya Swamy Temple Main Road, behind Shree Kalamma Temple, Nagartapete, Bengaluru, Bengaluru Urban, Karnataka - 560002",
   state: "Karnataka",
   stateCode: "29",

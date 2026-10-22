@@ -20,7 +20,7 @@ if (is_array($vmAssignedBranches)) {
 }
 
 $vmAssignedBranches = trim((string) $vmAssignedBranches);
-$vmLoginPassword = getenv('VM_LOGIN_PASSWORD') ?: 'vm-login';
+$vmLoginPassword = trim((string) getenv('VM_LOGIN_PASSWORD'));
 
 if ($attendanceBranchId !== '') {
     $attendanceUrl .= '&branch_id=' . rawurlencode($attendanceBranchId);
@@ -128,6 +128,7 @@ AND sender_type IN ('SubZonal', 'Master')
         <ul class="nav" id="side-menu">
             <li><a href="renewalStatus.php"><i style="color:#990000" class="fa fa-repeat"></i> RENEWALS</a></li>
                         <li><a href="<?php echo htmlspecialchars($attendanceUrl, ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener noreferrer"><i style="color:#990000" class="fa fa-check-square"></i> ATTENDANCE</a></li>
+                        <?php if ($vmLoginPassword !== ''): ?>
                         <li>
                             <form class="vm-attendance-menu-form" method="post" action="<?php echo htmlspecialchars($vmAttendanceUrl, ENT_QUOTES, 'UTF-8'); ?>" target="_blank">
                                 <input type="hidden" name="username" value="vm-login">
@@ -138,6 +139,7 @@ AND sender_type IN ('SubZonal', 'Master')
                                 </button>
                             </form>
                         </li>
+                        <?php endif; ?>
                         <!--<li><a href="addEmpdetailsAcc.php"><i style="color:#990000" class="fa fa-check-square"></i> ADD EMP A/C Details</a></li>-->
                         <li><a href="inbox.php"><i style="color:#990000" class="fa fa-envelope"></i> MAILBOX</a></li>
                         <li><a href="xeveryCustomer.php"><i style="color:#990000" class="fa fa-user"></i> NEW CUSTOMER</a></li>

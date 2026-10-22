@@ -25,7 +25,11 @@ export async function GET(request: NextRequest) {
   if (auth.error || !auth.session) return auth.error;
   const branchId = auth.session.branchId;
   const [settings, customers, transactions, pledgeDocuments, funds, expenses, closings, fundLedger, stockLedger, goldTransfers, eligibleTransferItems, verificationNotifications, availableFunds, availableStock] = await Promise.all([
-    one<RowDataPacket>("SELECT sale_rate_paise_per_gram AS saleRate, purchase_rate_paise_per_gram AS purchaseRate, updated_at AS updatedAt FROM business_settings WHERE id=1"),
+    one<RowDataPacket>(`SELECT
+      sale_rate_999_paise_per_gram AS saleRate999,purchase_rate_999_paise_per_gram AS purchaseRate999,
+      sale_rate_916_paise_per_gram AS saleRate916,purchase_rate_916_paise_per_gram AS purchaseRate916,
+      sale_rate_750_paise_per_gram AS saleRate750,purchase_rate_750_paise_per_gram AS purchaseRate750,
+      updated_at AS updatedAt FROM business_settings WHERE id=1`),
     rows<RowDataPacket>("SELECT id,name,phone,address,created_at AS createdAt FROM branch_customers WHERE branch_id=? ORDER BY id DESC LIMIT 100", [branchId]),
     rows<RowDataPacket>(`SELECT t.id,t.bill_id AS billId,t.transaction_type AS type,t.business_mode AS businessMode,t.gold_weight_mg AS weightMg,
       t.rate_paise_per_gram AS ratePaise,t.amount_paise AS amountPaise,t.pledge_amount_paise AS pledgeAmountPaise,

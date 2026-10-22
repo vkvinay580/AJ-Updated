@@ -7,6 +7,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import CameraField from "@/components/admin/CameraField";
 import { androidFile } from "@/lib/android";
 import { messageFrom, requestJson } from "@/lib/client-api";
+import { GOLD_PURITY_OPTIONS, goldPurityCode, goldRateFor, type GoldRateSettings, type GoldTransactionType } from "@/lib/gold-rates";
 
 type Customer = { id: number; name: string; phone: string; email?: string };
 type Item = { metal: "gold" | "silver"; description: string; itemDescription: string; hsnCode: string; purity: string; grossWeightGrams: string; stoneWeightGrams: string; netWeightGrams: string; ratePerGram: string; making: string };
@@ -28,7 +29,7 @@ const blank = (): Item => ({ metal: "gold", description: "Gold Ornament", itemDe
 const blankPayment = (method: PaymentMethod = "cash"): Payment => ({ method, amount: "", accountNumber: "", ifscCode: "", upiId: "", chequeNumber: "", cardNumber: "" });
 const money = (value: number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(value || 0);
 
-export default function BillForm({ portal = "admin", fixedRates, availableFundPaise = 0 }: { portal?: "admin" | "branch"; fixedRates?: { purchaseRate: number; saleRate: number }; availableFundPaise?: number }) {
+export default function BillForm({ portal = "admin", fixedRates, availableFundPaise = 0 }: { portal?: "admin" | "branch"; fixedRates?: GoldRateSettings; availableFundPaise?: number }) {
   const params = useSearchParams();
   const router = useRouter();
   const isBranch = portal === "branch";
@@ -37,15 +38,16 @@ export default function BillForm({ portal = "admin", fixedRates, availableFundPa
   const initial = params.get("customerId");
   const verificationRequestedAtCreation = params.get("verificationRequested") === "1";
   const pledgeId = isBranch ? params.get("pledgeId") : null;
-  const fixedRate = (nextType: string) => Number(nextType === "purchase" ? fixedRates?.purchaseRate : fixedRates?.saleRate) / 100;
-  const newItem = () => ({ ...blank(), ratePerGram: fixedRates ? String(fixedRate("purchase")) : "" });
+  const initialTransactionType: GoldTransactionType = isBranch ? "purchase" : "sale";
+  const fixedRate = (nextType: GoldTransactionType, purity: unknown) => goldRateFor(fixedRates, nextType, purity) / 100;
+  const newItem = (nextType: GoldTransactionType) => ({ ...blank(), ratePerGram: fixedRates ? String(fixedRate(nextType, "999")) : "" });
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Customer[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchAttempted, setSearchAttempted] = useState(false);
-  const [items, setItems] = useState<Item[]>([newItem()]);
-  const [type, setType] = useState<"sale" | "purchase">(isBranch ? "purchase" : "sale");
+  const [items, setItems] = useState<Item[]>([newItem(initialTransactionType)]);
+  const [type, setType] = useState<GoldTransactionType>(initialTransactionType);
   const [businessMode, setBusinessMode] = useState<BusinessMode>(pledgeId ? "pledged" : "walkin");
   const [pledgeAmount, setPledgeAmount] = useState("");
   const [pledgePaymentMethod, setPledgePaymentMethod] = useState("");
@@ -151,6 +153,7 @@ export default function BillForm({ portal = "admin", fixedRates, availableFundPa
   const update = (index: number, key: keyof Item, value: string) => setItems(current => current.map((item, itemIndex) => {
     if (itemIndex !== index) return item;
     const next = { ...item, [key]: value };
+    if (key === "purity" && fixedRates && next.metal === "gold") next.ratePerGram = String(fixedRate(type, value));
     if (key === "grossWeightGrams" || key === "stoneWeightGrams") {
       const gross = Number(next.grossWeightGrams), stone = Number(next.stoneWeightGrams);
       next.netWeightGrams = Number.isFinite(gross) && Number.isFinite(stone) && gross >= stone ? (gross - stone).toFixed(3) : "";
@@ -160,11 +163,21 @@ export default function BillForm({ portal = "admin", fixedRates, availableFundPa
   const selectDescription = (index: number, description: string) => setItems(current => current.map((item, itemIndex) => {
     if (itemIndex !== index) return item;
     const option = ITEM_OPTIONS.find(entry => entry.description === description);
-    return option ? { ...item, description, hsnCode: option.hsnCode, metal: option.metal } : { ...item, description };
+    if (!option) return { ...item, description };
+    const next = { ...item, description, hsnCode: option.hsnCode, metal: option.metal };
+    if (fixedRates && option.metal === "gold") {
+      const code = goldPurityCode(next.purity) || "999";
+      next.purity = GOLD_PURITY_OPTIONS.find(entry => entry.code === code)?.label || "24K / 999";
+      next.ratePerGram = String(fixedRate(type, code));
+    } else if (fixedRates && item.metal === "gold" && option.metal === "silver") {
+      next.purity = "";
+      next.ratePerGram = "";
+    }
+    return next;
   }));
   const selectType = (nextType: "sale" | "purchase") => {
     setType(nextType);
-    if (fixedRates) setItems(current => current.map(item => item.metal === "gold" ? { ...item, ratePerGram: String(fixedRate(nextType)) } : item));
+    if (fixedRates) setItems(current => current.map(item => item.metal === "gold" ? { ...item, ratePerGram: String(fixedRate(nextType, item.purity)) } : item));
     if (nextType === "purchase") setPayments(current => current.map(payment => ["card", "cheque"].includes(payment.method) ? { ...blankPayment("cash"), amount: payment.amount } : payment));
   };
   const updatePayment = (index: number, key: keyof Payment, value: string) => setPayments(current => current.map((payment, paymentIndex) => paymentIndex === index ? { ...payment, [key]: value } : payment));
@@ -226,8 +239,8 @@ export default function BillForm({ portal = "admin", fixedRates, availableFundPa
 
       {isBranch && !pledgeId && <section className="panel form-panel"><div className="form-section-heading"><span>02</span><div><h2>Purchase type</h2><p>Select how this purchase should move through the branch workflow.</p></div></div><div className="transaction-toggle"><button type="button" className={businessMode === "walkin" ? "active" : ""} onClick={() => setBusinessMode("walkin")}><strong>Walk-in purchase</strong><span>Complete purchase details and submit for admin approval</span></button><button type="button" className={businessMode === "pledged" ? "active" : ""} onClick={() => setBusinessMode("pledged")}><strong>Pledged purchase</strong><span>Add pledge details now and complete purchase billing only after release</span></button></div>{businessMode === "pledged" && <div className="form-grid pledge-fields"><label>Pledge amount (₹)<input name="pledgeAmount" value={pledgeAmount} onChange={event=>setPledgeAmount(event.target.value)} required type="number" min="1" step="0.01"/></label><label>Release place<input name="releasePlace" value={releasePlace} onChange={event=>setReleasePlace(event.target.value)} required maxLength={190} placeholder="Bank / finance company / lender"/></label><label>Release amount (₹)<input name="releaseAmount" value={releaseAmount} onChange={event=>setReleaseAmount(event.target.value)} required type="number" min="0.01" step="0.01"/></label><div className="full"><CameraField label="Pledge bill document" name="pledgeDocument" acceptPdf multiple/></div></div>}</section>}
 
-      {!isPledgeIntake && <section className="panel form-panel"><div className="form-section-heading"><span>{isBranch ? "03" : "02"}</span><div><h2>{pledgeId ? "Released pledge billing" : isBranch ? "Purchase details" : "Transaction details"}</h2><p>{pledgeId ? `Complete the purchase using the saved release details for ${releasePlace || "this pledge"}.` : isBranch ? "Branches can create purchase bills only. The fixed purchase rate is applied automatically." : "Choose whether the company is selling or purchasing gold."}</p></div></div>{!isBranch && <div className="transaction-toggle"><button type="button" className={type === "sale" ? "active" : ""} onClick={() => selectType("sale")}><strong>Sale</strong><span>Company sells gold to customer</span></button><button type="button" className={type === "purchase" ? "active" : ""} onClick={() => selectType("purchase")}><strong>Purchase</strong><span>Company buys gold from customer</span></button></div>}
-        <div className="items-head"><h3>Bill items</h3><button type="button" onClick={() => setItems([...items, newItem()])}><Plus/> Add item</button></div><div className="bill-items">{items.map((item, index) => <div className="bill-item" key={index}><div className="item-number">{String(index + 1).padStart(2, "0")}</div><label className="description">Item type<select required value={item.description} onChange={event => selectDescription(index, event.target.value)}>{ITEM_OPTIONS.map(option => <option key={option.description}>{option.description}</option>)}</select></label>{isBranch && <label className="item-description">Item description<input value={item.itemDescription} maxLength={190} placeholder="Item description" onChange={event => update(index, "itemDescription", event.target.value)}/></label>}<label>HSN code<input required readOnly value={item.hsnCode}/></label><label>Purity<input value={item.purity} onChange={event => update(index, "purity", event.target.value)}/></label><label>Gross W (g)<input required type="number" min="0.001" step="0.001" value={item.grossWeightGrams} onChange={event => update(index, "grossWeightGrams", event.target.value)}/></label><label>Stone W (g)<input required type="number" min="0" max={item.grossWeightGrams || undefined} step="0.001" value={item.stoneWeightGrams} onChange={event => update(index, "stoneWeightGrams", event.target.value)}/></label><label>Net W (g)<input required readOnly type="number" min="0.001" step="0.001" value={item.netWeightGrams}/></label><label>Rate / gram<input required type="number" min="0.01" step="0.01" value={item.ratePerGram} onChange={event => update(index, "ratePerGram", event.target.value)}/></label><label>Making / other<input type="number" step="0.01" value={item.making} onChange={event => update(index, "making", event.target.value)}/></label><div className="item-amount"><span>Amount</span><strong>{money((Number(item.netWeightGrams) || 0) * (Number(item.ratePerGram) || 0) + (Number(item.making) || 0))}</strong></div>{items.length > 1 && <button className="remove-item" type="button" aria-label={`Remove bill item ${index + 1}`} onClick={() => setItems(items.filter((_, itemIndex) => itemIndex !== index))}><Trash2/></button>}</div>)}</div>
+      {!isPledgeIntake && <section className="panel form-panel"><div className="form-section-heading"><span>{isBranch ? "03" : "02"}</span><div><h2>{pledgeId ? "Released pledge billing" : isBranch ? "Purchase details" : "Transaction details"}</h2><p>{pledgeId ? `Complete the purchase using the saved release details for ${releasePlace || "this pledge"}.` : isBranch ? "The purchase rate is filled from the selected purity and can be edited." : "Choose whether the company is selling or purchasing gold. The rate is filled from the selected purity."}</p></div></div>{!isBranch && <div className="transaction-toggle"><button type="button" className={type === "sale" ? "active" : ""} onClick={() => selectType("sale")}><strong>Sale</strong><span>Company sells gold to customer</span></button><button type="button" className={type === "purchase" ? "active" : ""} onClick={() => selectType("purchase")}><strong>Purchase</strong><span>Company buys gold from customer</span></button></div>}
+        <div className="items-head"><h3>Bill items</h3><button type="button" onClick={() => setItems([...items, newItem(type)])}><Plus/> Add item</button></div><div className="bill-items">{items.map((item, index) => <div className="bill-item" key={index}><div className="item-number">{String(index + 1).padStart(2, "0")}</div><label className="description">Item type<select required value={item.description} onChange={event => selectDescription(index, event.target.value)}>{ITEM_OPTIONS.map(option => <option key={option.description}>{option.description}</option>)}</select></label>{isBranch && <label className="item-description">Item description<input value={item.itemDescription} maxLength={190} placeholder="Item description" onChange={event => update(index, "itemDescription", event.target.value)}/></label>}<label>HSN code<input required readOnly value={item.hsnCode}/></label><label>Purity{fixedRates&&item.metal==="gold"?<select required value={item.purity} onChange={event=>update(index,"purity",event.target.value)}>{GOLD_PURITY_OPTIONS.map(option=><option key={option.code} value={option.label}>{option.label}</option>)}</select>:<input value={item.purity} onChange={event => update(index, "purity", event.target.value)}/>}</label><label>Gross W (g)<input required type="number" min="0.001" step="0.001" value={item.grossWeightGrams} onChange={event => update(index, "grossWeightGrams", event.target.value)}/></label><label>Stone W (g)<input required type="number" min="0" max={item.grossWeightGrams || undefined} step="0.001" value={item.stoneWeightGrams} onChange={event => update(index, "stoneWeightGrams", event.target.value)}/></label><label>Net W (g)<input required readOnly type="number" min="0.001" step="0.001" value={item.netWeightGrams}/></label><label>Rate / gram<input required type="number" min="0.01" step="0.01" value={item.ratePerGram} onChange={event => update(index, "ratePerGram", event.target.value)}/></label><label>Making / other<input type="number" step="0.01" value={item.making} onChange={event => update(index, "making", event.target.value)}/></label><div className="item-amount"><span>Amount</span><strong>{money((Number(item.netWeightGrams) || 0) * (Number(item.ratePerGram) || 0) + (Number(item.making) || 0))}</strong></div>{items.length > 1 && <button className="remove-item" type="button" aria-label={`Remove bill item ${index + 1}`} onClick={() => setItems(items.filter((_, itemIndex) => itemIndex !== index))}><Trash2/></button>}</div>)}</div>
       </section>}
 
       <section className="panel form-panel"><div className="form-section-heading"><span>{isBranch ? isPledgeIntake?"03":"04" : "03"}</span><div><h2>Payment & notes</h2><p>{isPledgeIntake?"Record how the pledge amount is being paid and add any intake notes.":type==="purchase"?"Split the payable amount between cash, UPI, or bank transfer.":"Split the payable amount between cash, UPI, bank, card, or cheque."}</p></div></div>

@@ -34,7 +34,7 @@ export async function GET(request:NextRequest,context:{params:Promise<{id:string
   if(showLogo){try{doc.image(logoPath,42,top,{fit:[48,48],align:"center",valign:"center"})}catch{}}
   const headerCompanyX=showLogo?98:42,companyWidth=showLogo?264:320;
   doc.fontSize(17).fillColor(gold).text(session.companyName,headerCompanyX,top,{width:companyWidth});
-  doc.font("Helvetica").fontSize(6.5).fillColor("#333").text(profile.address,headerCompanyX,top+20,{width:companyWidth,height:17,ellipsis:true}).font("Helvetica-Bold").text(`GSTIN/UIN: ${profile.gstin}`,headerCompanyX,top+38).font("Helvetica").text(`State: ${profile.state}, Code: ${profile.stateCode}  |  Contact: ${profile.phone}`,headerCompanyX,top+48);
+  doc.font("Helvetica").fontSize(6.5).fillColor("#333").text(profile.address,headerCompanyX,top+20,{width:companyWidth,height:17,ellipsis:true}).font("Helvetica-Bold").text(`GSTIN/UIN: ${profile.gstin}${profile.pan?`  |  PAN: ${profile.pan}`:""}`,headerCompanyX,top+38).font("Helvetica").text(`State: ${profile.state}, Code: ${profile.stateCode}  |  Contact: ${profile.phone}`,headerCompanyX,top+48);
   doc.font("Helvetica-Bold").fontSize(12).fillColor(gold).text(invoiceTitle,375,top+2,{width:178,align:"right"}).fontSize(7).fillColor("#333").text(String(bill.billNumber),375,top+20,{width:178,align:"right"}).font("Helvetica").text(`Dated: ${bill.billDate}`,375,top+32,{width:178,align:"right"});
   doc.y=top+59;doc.lineWidth(2).strokeColor(gold).moveTo(42,doc.y).lineTo(553,doc.y).stroke();doc.lineWidth(1);
   const partyY=doc.y+6,partyH=62;doc.strokeColor(line).rect(42,partyY,511,partyH).stroke().moveTo(374,partyY).lineTo(374,partyY+partyH).stroke();

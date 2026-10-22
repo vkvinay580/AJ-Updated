@@ -63,6 +63,10 @@ CREATE TABLE IF NOT EXISTS customers (
   old_gold_wearing_image_path VARCHAR(255) NULL,
   old_gold_wearing_image_original_name VARCHAR(255) NULL,
   old_gold_wearing_image_mime_type VARCHAR(100) NULL,
+  recommendation_name VARCHAR(190) NULL,
+  recommendation_relationship VARCHAR(120) NULL,
+  recommendation_phone VARCHAR(20) NULL,
+  recommendation_address VARCHAR(500) NULL,
   origin_branch_id VARCHAR(100) NULL,
   created_by_employee_id VARCHAR(100) NULL,
   created_by INT UNSIGNED NULL,
@@ -169,6 +173,9 @@ CREATE TABLE IF NOT EXISTS customer_verification_photos (
   file_path VARCHAR(500) NOT NULL,
   original_name VARCHAR(255) NOT NULL,
   mime_type VARCHAR(100) NOT NULL,
+  latitude DECIMAL(10,7) NULL,
+  longitude DECIMAL(10,7) NULL,
+  captured_at DATETIME NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id), KEY idx_verification_photos_request (request_id, id),
   CONSTRAINT fk_verification_photo_request FOREIGN KEY (request_id) REFERENCES customer_verification_requests(id) ON DELETE CASCADE
@@ -182,6 +189,9 @@ CREATE TABLE IF NOT EXISTS customer_verification_videos (
   mime_type VARCHAR(100) NOT NULL DEFAULT 'video/mp4',
   duration_ms INT UNSIGNED NOT NULL,
   byte_size INT UNSIGNED NOT NULL,
+  latitude DECIMAL(10,7) NULL,
+  longitude DECIMAL(10,7) NULL,
+  captured_at DATETIME NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id), UNIQUE KEY uq_verification_video_request (request_id),
   CONSTRAINT fk_verification_video_request FOREIGN KEY (request_id) REFERENCES customer_verification_requests(id) ON DELETE CASCADE
@@ -197,6 +207,18 @@ CREATE TABLE IF NOT EXISTS customer_verification_references (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id), KEY idx_verification_references_request (request_id, id),
   CONSTRAINT fk_verification_reference_request FOREIGN KEY (request_id) REFERENCES customer_verification_requests(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS verification_result_views (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  request_id BIGINT UNSIGNED NOT NULL,
+  viewer_role ENUM('admin','floor','branch') NOT NULL,
+  viewer_key VARCHAR(120) NOT NULL,
+  viewed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_verification_viewer (request_id, viewer_role, viewer_key),
+  KEY idx_verification_views_request (request_id, viewed_at),
+  CONSTRAINT fk_verification_view_request FOREIGN KEY (request_id) REFERENCES customer_verification_requests(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS branch_notifications (
@@ -383,12 +405,20 @@ CREATE TABLE IF NOT EXISTS business_settings (
   id TINYINT UNSIGNED NOT NULL DEFAULT 1,
   sale_rate_paise_per_gram BIGINT UNSIGNED NOT NULL DEFAULT 0,
   purchase_rate_paise_per_gram BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  sale_rate_999_paise_per_gram BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  purchase_rate_999_paise_per_gram BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  sale_rate_916_paise_per_gram BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  purchase_rate_916_paise_per_gram BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  sale_rate_750_paise_per_gram BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  purchase_rate_750_paise_per_gram BIGINT UNSIGNED NOT NULL DEFAULT 0,
   updated_by INT UNSIGNED NULL,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   CONSTRAINT fk_business_settings_admin FOREIGN KEY (updated_by) REFERENCES admins(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Keep this seed compatible with existing installations whose purity columns are
+-- added by scripts/setup-db.mjs immediately after the base schema is applied.
 INSERT IGNORE INTO business_settings (id, sale_rate_paise_per_gram, purchase_rate_paise_per_gram)
 VALUES (1, 1520000, 1480000);
 

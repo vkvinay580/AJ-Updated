@@ -17,7 +17,6 @@ class VmAttendanceController extends Controller
 {
     private const SESSION_KEY = 'vm_attendance_user';
     private const LOGIN_NAME = 'vm-login';
-    private const DEFAULT_PASSWORD = 'vm-login';
     private const STATUS_FULL_DAY = 'full_day';
     private const STATUS_FULL_DAY_REMOTE = 'full_day_remote';
     private const STATUS_HALF_DAY = 'half_day';
@@ -262,9 +261,7 @@ class VmAttendanceController extends Controller
 
     private function vmPassword(): string
     {
-        $configured = trim((string) env('VM_LOGIN_PASSWORD', ''));
-
-        return $configured !== '' ? $configured : self::DEFAULT_PASSWORD;
+        return trim((string) env('VM_LOGIN_PASSWORD', ''));
     }
 
     private function resolveDate(Request $request, string $timezone): Carbon
