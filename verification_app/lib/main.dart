@@ -9,6 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:workmanager/workmanager.dart';
@@ -158,34 +160,89 @@ Future<void> main() async {
 }
 
 class AryanVerificationApp extends StatefulWidget {
-  const AryanVerificationApp({super.key});
+  const AryanVerificationApp({super.key, this.updateChecker});
+
+  final Future<AppUpdatePolicy?> Function()? updateChecker;
+
   @override
   State<AryanVerificationApp> createState() => _AryanVerificationAppState();
 }
 
-class _AryanVerificationAppState extends State<AryanVerificationApp> {
+class _AryanVerificationAppState extends State<AryanVerificationApp>
+    with WidgetsBindingObserver {
   String? token;
   Map<String, dynamic>? user;
   bool loading = true;
+  AppUpdatePolicy? requiredUpdate;
 
   @override
   void initState() {
     super.initState();
-    _restore();
+    WidgetsBinding.instance.addObserver(this);
+    _bootstrap();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _checkForRequiredUpdate();
+  }
+
+  Future<void> _bootstrap() async {
+    await Future.wait([_restore(), _checkForRequiredUpdate()]);
+    if (mounted) setState(() => loading = false);
   }
 
   Future<void> _restore() async {
     final prefs = await SharedPreferences.getInstance();
     final savedUser = prefs.getString('te_user');
     if (!mounted) return;
-    setState(() {
-      token = prefs.getString('te_token');
-      user = savedUser == null
-          ? null
-          : jsonDecode(savedUser) as Map<String, dynamic>;
-      loading = false;
-    });
+    token = prefs.getString('te_token');
+    user = savedUser == null
+        ? null
+        : jsonDecode(savedUser) as Map<String, dynamic>;
     if (token != null) await scheduleVerificationPolling();
+  }
+
+  Future<void> _checkForRequiredUpdate() async {
+    try {
+      if (widget.updateChecker != null) {
+        final policy = await widget.updateChecker!();
+        if (mounted) setState(() => requiredUpdate = policy);
+        return;
+      }
+      final package = await PackageInfo.fromPlatform();
+      final currentVersionCode = int.tryParse(package.buildNumber) ?? 0;
+      final response = await http
+          .get(
+            Uri.parse('$apiBase/verification/app-update'),
+            headers: const {
+              'Accept': 'application/json',
+              'Cache-Control': 'no-cache',
+            },
+          )
+          .timeout(const Duration(seconds: 12));
+      if (response.statusCode != 200) return;
+      final policy = AppUpdatePolicy.fromJson(
+        jsonDecode(response.body) as Map<String, dynamic>,
+        currentVersionName: package.version,
+        currentVersionCode: currentVersionCode,
+      );
+      if (!mounted) return;
+      setState(() {
+        requiredUpdate = currentVersionCode < policy.minimumVersionCode
+            ? policy
+            : null;
+      });
+    } catch (_) {
+      // A temporary network failure must not brick an otherwise usable app.
+      // Once an update requirement has been received, it remains blocking.
+    }
   }
 
   Future<void> signedIn(String nextToken, Map<String, dynamic> nextUser) async {
@@ -261,9 +318,185 @@ class _AryanVerificationAppState extends State<AryanVerificationApp> {
     ),
     home: loading
         ? const SplashPage()
+        : requiredUpdate != null
+        ? UpdateRequiredPage(
+            policy: requiredUpdate!,
+            onRetry: _checkForRequiredUpdate,
+          )
         : token == null
         ? LoginPage(onSignedIn: signedIn)
         : HomePage(token: token!, user: user ?? const {}, onSignOut: signOut),
+  );
+}
+
+class AppUpdatePolicy {
+  const AppUpdatePolicy({
+    required this.currentVersionName,
+    required this.currentVersionCode,
+    required this.latestVersionName,
+    required this.latestVersionCode,
+    required this.minimumVersionCode,
+    required this.downloadUrl,
+    required this.message,
+  });
+
+  factory AppUpdatePolicy.fromJson(
+    Map<String, dynamic> json, {
+    required String currentVersionName,
+    required int currentVersionCode,
+  }) {
+    final latestVersionCode = (json['latestVersionCode'] as num?)?.toInt();
+    final minimumVersionCode = (json['minimumVersionCode'] as num?)?.toInt();
+    final downloadUrl = json['downloadUrl']?.toString() ?? '';
+    final downloadUri = Uri.tryParse(downloadUrl);
+    if (latestVersionCode == null ||
+        minimumVersionCode == null ||
+        minimumVersionCode < 1 ||
+        latestVersionCode < minimumVersionCode ||
+        downloadUri == null ||
+        !downloadUri.hasScheme) {
+      throw const FormatException('Invalid app update policy');
+    }
+    return AppUpdatePolicy(
+      currentVersionName: currentVersionName,
+      currentVersionCode: currentVersionCode,
+      latestVersionName: json['latestVersionName']?.toString() ?? '',
+      latestVersionCode: latestVersionCode,
+      minimumVersionCode: minimumVersionCode,
+      downloadUrl: downloadUrl,
+      message:
+          json['message']?.toString() ??
+          'A new Aryan Verification update is required to continue.',
+    );
+  }
+
+  final String currentVersionName;
+  final int currentVersionCode;
+  final String latestVersionName;
+  final int latestVersionCode;
+  final int minimumVersionCode;
+  final String downloadUrl;
+  final String message;
+}
+
+class UpdateRequiredPage extends StatefulWidget {
+  const UpdateRequiredPage({
+    super.key,
+    required this.policy,
+    required this.onRetry,
+  });
+
+  final AppUpdatePolicy policy;
+  final Future<void> Function() onRetry;
+
+  @override
+  State<UpdateRequiredPage> createState() => _UpdateRequiredPageState();
+}
+
+class _UpdateRequiredPageState extends State<UpdateRequiredPage> {
+  bool opening = false;
+  bool checking = false;
+
+  Future<void> _openUpdate() async {
+    setState(() => opening = true);
+    try {
+      await launchUrl(
+        Uri.parse(widget.policy.downloadUrl),
+        mode: LaunchMode.externalApplication,
+      );
+    } finally {
+      if (mounted) setState(() => opening = false);
+    }
+  }
+
+  Future<void> _retry() async {
+    setState(() => checking = true);
+    await widget.onRetry();
+    if (mounted) setState(() => checking = false);
+  }
+
+  @override
+  Widget build(BuildContext context) => PopScope(
+    canPop: false,
+    child: Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(28),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(28),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const BrandMark(size: 76),
+                      const SizedBox(height: 22),
+                      const Icon(
+                        Icons.system_update_alt_rounded,
+                        size: 54,
+                        color: Color(0xff176354),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        'Update required',
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        widget.policy.message,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyLarge,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Installed ${widget.policy.currentVersionName} '
+                        '(build ${widget.policy.currentVersionCode})  •  '
+                        'Latest ${widget.policy.latestVersionName} '
+                        '(build ${widget.policy.latestVersionCode})',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: opening ? null : _openUpdate,
+                          icon: opening
+                              ? const SizedBox.square(
+                                  dimension: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.download_rounded),
+                          label: const Text('Download latest update'),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton.icon(
+                        onPressed: checking ? null : _retry,
+                        icon: checking
+                            ? const SizedBox.square(
+                                dimension: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.refresh_rounded),
+                        label: const Text('I have updated — check again'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
   );
 }
 
@@ -325,18 +558,13 @@ class BrandMark extends StatelessWidget {
   const BrandMark({super.key, this.size = 64});
   final double size;
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) => SizedBox(
     width: size,
     height: size,
-    decoration: BoxDecoration(
-      shape: BoxShape.circle,
-      color: const Color(0xff123d35),
-      border: Border.all(color: const Color(0xffd7aa47), width: 3),
-    ),
-    child: Icon(
-      Icons.verified_user_outlined,
-      color: const Color(0xffffd978),
-      size: size * .54,
+    child: Image.asset(
+      'assets/images/aryan_gold_logo.png',
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.high,
     ),
   );
 }
@@ -792,8 +1020,27 @@ class RequestDetailPage extends StatefulWidget {
   State<RequestDetailPage> createState() => _RequestDetailPageState();
 }
 
+class EvidenceLocation {
+  const EvidenceLocation(this.latitude, this.longitude, this.capturedAt);
+  final double latitude;
+  final double longitude;
+  final DateTime capturedAt;
+  Map<String, dynamic> toJson() => {
+    'latitude': latitude,
+    'longitude': longitude,
+    'capturedAt': capturedAt.toUtc().toIso8601String(),
+  };
+}
+
+class CapturedPhoto {
+  const CapturedPhoto(this.file, this.location);
+  final XFile file;
+  final EvidenceLocation location;
+}
+
 class _RequestDetailPageState extends State<RequestDetailPage> {
   VisitVideo? visitVideo;
+  EvidenceLocation? videoLocation;
   bool preparingVideo = false;
   double compressionProgress = 0;
   final authName = TextEditingController(),
@@ -803,11 +1050,40 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
       failure = TextEditingController(),
       picker = ImagePicker();
   final references = <ReferenceFields>[ReferenceFields()];
-  final photos = <XFile>[];
+  final photos = <CapturedPhoto>[];
   String outcome = 'verified', error = '';
   bool saving = false;
   Future<void> call(String phone) async =>
       launchUrl(Uri.parse('tel:+91$phone'));
+  Future<EvidenceLocation> captureLocation() async {
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      throw const FormatException(
+        'Turn on phone location before capturing verification evidence.',
+      );
+    }
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      throw const FormatException(
+        'Location permission is required for verification photos and video.',
+      );
+    }
+    final position = await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        timeLimit: Duration(seconds: 20),
+      ),
+    );
+    return EvidenceLocation(
+      position.latitude,
+      position.longitude,
+      DateTime.now(),
+    );
+  }
+
   Future<void> startVisit() async {
     final response = await Api(
       widget.token,
@@ -831,12 +1107,22 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
   }
 
   Future<void> takePhoto() async {
-    final photo = await picker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 82,
-      maxWidth: 1800,
-    );
-    if (photo != null && mounted) setState(() => photos.add(photo));
+    try {
+      final photo = await picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 82,
+        maxWidth: 1800,
+      );
+      if (photo == null) return;
+      final location = await captureLocation();
+      if (mounted) setState(() => photos.add(CapturedPhoto(photo, location)));
+    } catch (caught) {
+      if (mounted) {
+        setState(
+          () => error = caught.toString().replaceFirst('FormatException: ', ''),
+        );
+      }
+    }
   }
 
   Future<void> choosePhotos() async {
@@ -844,8 +1130,26 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
       imageQuality: 82,
       maxWidth: 1800,
     );
-    if (selected.isNotEmpty && mounted) {
-      setState(() => photos.addAll(selected.take(12 - photos.length)));
+    if (selected.isNotEmpty) {
+      try {
+        final location = await captureLocation();
+        if (mounted) {
+          setState(
+            () => photos.addAll(
+              selected
+                  .take(12 - photos.length)
+                  .map((photo) => CapturedPhoto(photo, location)),
+            ),
+          );
+        }
+      } catch (caught) {
+        if (mounted) {
+          setState(
+            () =>
+                error = caught.toString().replaceFirst('FormatException: ', ''),
+          );
+        }
+      }
     }
   }
 
@@ -869,13 +1173,17 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
       );
       if (captured == null) return;
       capturedPath = captured.path;
+      final location = await captureLocation();
       final prepared = await compressVisitVideo(captured.path);
       if (!mounted) {
         await prepared.file.delete();
         return;
       }
       final old = visitVideo;
-      setState(() => visitVideo = prepared);
+      setState(() {
+        visitVideo = prepared;
+        videoLocation = location;
+      });
       if (old != null &&
           old.file.path != prepared.file.path &&
           await old.file.exists()) {
@@ -899,7 +1207,10 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
 
   Future<void> removeVideo() async {
     final old = visitVideo;
-    setState(() => visitVideo = null);
+    setState(() {
+      visitVideo = null;
+      videoLocation = null;
+    });
     if (old != null && await old.file.exists()) await old.file.delete();
   }
 
@@ -926,13 +1237,23 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
         'references': jsonEncode(
           references.map((reference) => reference.toJson()).toList(),
         ),
+        'photoMetadata': jsonEncode(
+          photos.map((photo) => photo.location.toJson()).toList(),
+        ),
+        'videoMetadata': jsonEncode(videoLocation?.toJson()),
       });
+      final finalLocation =
+          videoLocation ?? (photos.isNotEmpty ? photos.last.location : null);
+      if (finalLocation != null) {
+        request.fields['latitude'] = finalLocation.latitude.toString();
+        request.fields['longitude'] = finalLocation.longitude.toString();
+      }
       for (final photo in photos) {
         request.files.add(
           await http.MultipartFile.fromPath(
             'photos',
-            photo.path,
-            filename: photo.name,
+            photo.file.path,
+            filename: photo.file.name,
           ),
         );
       }
@@ -1001,6 +1322,19 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
   @override
   Widget build(BuildContext context) {
     final request = widget.request, complete = request.complete;
+    final authenticationComplete =
+        authName.text.trim().length >= 2 &&
+        authRelationship.text.trim().isNotEmpty &&
+        authPhone.text.replaceAll(RegExp(r'\D'), '').length == 10;
+    final referencesComplete = references.any(
+      (reference) =>
+          reference.name.text.trim().length >= 2 &&
+          reference.relationship.text.trim().isNotEmpty &&
+          reference.phone.text.replaceAll(RegExp(r'\D'), '').length == 10,
+    );
+    final resultComplete = outcome == 'verified'
+        ? notes.text.trim().isNotEmpty
+        : failure.text.trim().isNotEmpty;
     return Scaffold(
       appBar: AppBar(title: Text('Verification #${request.id}')),
       body: ListView(
@@ -1078,6 +1412,7 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
             DetailCard(
               title: 'Visit photos',
               icon: Icons.add_a_photo_outlined,
+              complete: photos.length >= 2,
               children: [
                 Text(
                   'Take multiple photos at the customer home. At least two are required for a verified result.',
@@ -1115,10 +1450,26 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(8),
                                   child: Image.file(
-                                    File(entry.value.path),
+                                    File(entry.value.file.path),
                                     width: 92,
                                     height: 92,
                                     fit: BoxFit.cover,
+                                  ),
+                                ),
+                                Positioned(
+                                  left: 3,
+                                  bottom: 3,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.green,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.location_on,
+                                      color: Colors.white,
+                                      size: 14,
+                                    ),
                                   ),
                                 ),
                                 Positioned(
@@ -1143,6 +1494,7 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
             DetailCard(
               title: 'Visit video (optional)',
               icon: Icons.videocam_outlined,
+              complete: visitVideo != null && videoLocation != null,
               children: [
                 const Text(
                   'Record up to 2 minutes. The video is compressed on your phone before upload.',
@@ -1168,6 +1520,8 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
                     Text(
                       '${(visitVideo!.durationMs / 1000).ceil()} seconds · ${(visitVideo!.compressedBytes / 1048576).toStringAsFixed(1)} MB ready to upload',
                     ),
+                    if (videoLocation != null)
+                      const Text('✓ Google location captured'),
                     TextButton.icon(
                       onPressed: saving ? null : removeVideo,
                       icon: const Icon(Icons.delete_outline),
@@ -1180,14 +1534,17 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
             DetailCard(
               title: 'Authentication person',
               icon: Icons.verified_user_outlined,
+              complete: authenticationComplete,
               children: [
                 TextField(
                   controller: authName,
+                  onChanged: (_) => setState(() {}),
                   decoration: const InputDecoration(labelText: 'Full name'),
                 ),
                 const SizedBox(height: 11),
                 TextField(
                   controller: authRelationship,
+                  onChanged: (_) => setState(() {}),
                   decoration: const InputDecoration(
                     labelText: 'Relationship / designation',
                   ),
@@ -1195,6 +1552,7 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
                 const SizedBox(height: 11),
                 TextField(
                   controller: authPhone,
+                  onChanged: (_) => setState(() {}),
                   keyboardType: TextInputType.phone,
                   maxLength: 10,
                   decoration: const InputDecoration(
@@ -1207,11 +1565,13 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
             DetailCard(
               title: 'Customer references',
               icon: Icons.groups_outlined,
+              complete: referencesComplete,
               children: [
                 ...references.asMap().entries.map(
                   (entry) => ReferenceEditor(
                     index: entry.key,
                     fields: entry.value,
+                    onChanged: () => setState(() {}),
                     remove: references.length == 1
                         ? null
                         : () {
@@ -1233,6 +1593,7 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
             DetailCard(
               title: 'Verification result',
               icon: Icons.fact_check_outlined,
+              complete: resultComplete,
               children: [
                 RadioGroup<String>(
                   groupValue: outcome,
@@ -1259,6 +1620,7 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
                 ),
                 TextField(
                   controller: notes,
+                  onChanged: (_) => setState(() {}),
                   maxLines: 4,
                   maxLength: 2000,
                   decoration: const InputDecoration(
@@ -1270,6 +1632,7 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
                     padding: const EdgeInsets.only(top: 11),
                     child: TextField(
                       controller: failure,
+                      onChanged: (_) => setState(() {}),
                       maxLines: 3,
                       maxLength: 1000,
                       decoration: const InputDecoration(
@@ -1296,6 +1659,7 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
             DetailCard(
               title: 'Completed result',
               icon: Icons.task_alt,
+              complete: true,
               children: [
                 StatusChip(request.status),
                 const SizedBox(height: 10),
@@ -1341,10 +1705,12 @@ class ReferenceEditor extends StatelessWidget {
     super.key,
     required this.index,
     required this.fields,
+    required this.onChanged,
     this.remove,
   });
   final int index;
   final ReferenceFields fields;
+  final VoidCallback onChanged;
   final VoidCallback? remove;
   @override
   Widget build(BuildContext context) => Container(
@@ -1372,16 +1738,19 @@ class ReferenceEditor extends StatelessWidget {
         ),
         TextField(
           controller: fields.name,
+          onChanged: (_) => onChanged(),
           decoration: const InputDecoration(labelText: 'Name'),
         ),
         const SizedBox(height: 9),
         TextField(
           controller: fields.relationship,
+          onChanged: (_) => onChanged(),
           decoration: const InputDecoration(labelText: 'Relationship'),
         ),
         const SizedBox(height: 9),
         TextField(
           controller: fields.phone,
+          onChanged: (_) => onChanged(),
           keyboardType: TextInputType.phone,
           maxLength: 10,
           decoration: const InputDecoration(
@@ -1392,6 +1761,7 @@ class ReferenceEditor extends StatelessWidget {
         const SizedBox(height: 9),
         TextField(
           controller: fields.notes,
+          onChanged: (_) => onChanged(),
           decoration: const InputDecoration(labelText: 'Reference notes'),
         ),
       ],
@@ -1405,10 +1775,12 @@ class DetailCard extends StatelessWidget {
     required this.title,
     required this.icon,
     required this.children,
+    this.complete = false,
   });
   final String title;
   final IconData icon;
   final List<Widget> children;
+  final bool complete;
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 13),
@@ -1429,6 +1801,9 @@ class DetailCard extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
+                const Spacer(),
+                if (complete)
+                  const Icon(Icons.check_circle, color: Colors.green),
               ],
             ),
             const Divider(height: 25),

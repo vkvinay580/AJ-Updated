@@ -12,24 +12,31 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-/*
-|--------------------------------------------------------------------------
-| CONFIG
-|--------------------------------------------------------------------------
-| Fill these values for biz.aryangold.in before upload.
-*/
-$DB_HOST = 'localhost';
-$DB_NAME = 'your_database_name';
-$DB_USER = 'your_database_user';
-$DB_PASS = 'your_database_password';
-
-/*
-|--------------------------------------------------------------------------
-| SHARED TOKEN
-|--------------------------------------------------------------------------
-| Must exactly match ARYANGOLD_EMPLOYEE_SYNC_TOKEN in Laravel.
-*/
-$SYNC_TOKEN = 'c64cf6d0659e9547aebc3ad18319e83c976b2af5bccfad31048baee1c2bcfe8c';
+try {
+    $vault = require __DIR__.'/vault.php';
+    $secret = static function (string $name) use ($vault): string {
+        $value = $vault[$name] ?? getenv($name);
+
+        return is_scalar($value) ? trim((string) $value) : '';
+    };
+
+    $DB_HOST = $secret('DB_HOST');
+    $DB_NAME = $secret('DB_NAME');
+    $DB_USER = $secret('DB_USER');
+    $DB_PASS = $secret('DB_PASSWORD');
+    $SYNC_TOKEN = $secret('ARYANGOLD_EMPLOYEE_SYNC_TOKEN');
+
+    if (in_array('', [$DB_HOST, $DB_NAME, $DB_USER, $DB_PASS, $SYNC_TOKEN], true)) {
+        throw new RuntimeException('Required employee-sync secrets are unavailable.');
+    }
+} catch (Throwable) {
+    http_response_code(503);
+    echo json_encode([
+        'ok' => false,
+        'message' => 'Employee sync is temporarily unavailable.',
+    ]);
+    exit;
+}
 
 $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
 

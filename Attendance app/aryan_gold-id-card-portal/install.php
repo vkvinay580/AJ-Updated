@@ -34,5 +34,5 @@ try {
     $error = $e->getMessage();
 }
 ?>
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Install</title><link rel="stylesheet" href="assets/css/app.css"></head>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" type="image/png" href="assets/img/favicon.png?v=20261020"><title>Install</title><link rel="stylesheet" href="assets/css/app.css"></head>
 <body class="auth-page"><main class="auth-shell"><section class="auth-card"><div class="brand-mark">A</div><h1>Portal installation</h1><p>Create the first administrator account.</p><?php if($message): ?><div class="alert success"><?=e($message)?></div><?php endif; ?><?php if($error): ?><div class="alert danger"><?=e($error)?></div><?php endif; ?><form method="post" class="stack"><input type="hidden" name="csrf" value="<?=e(csrf_token())?>"><label>Administrator name<input name="name" required></label><label>Email<input type="email" name="email" required></label><label>Password<input type="password" name="password" minlength="8" required></label><button class="btn primary">Complete installation</button></form><a class="text-link" href="admin/login.php">Go to admin login</a></section></main></body></html>

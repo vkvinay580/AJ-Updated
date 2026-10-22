@@ -42,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } catch (Throwable $e) {$flash=['type'=>'danger','message'=>$e->getMessage()];}
 }
 ?>
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Add employee</title><link rel="stylesheet" href="../assets/css/app.css"></head><body>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" type="image/png" href="../assets/img/favicon.png?v=20261020"><title>Add employee</title><link rel="stylesheet" href="../assets/css/app.css"></head><body>
 <div class="dashboard"><aside class="sidebar"><img src="../assets/img/aryan_gold-logo.png" alt="Aryan Gold"><nav class="nav"><a href="index.php">Dashboard</a><a class="active" href="add.php">Add employee</a><a href="../index.php" target="_blank">Employee form</a></nav><div class="sidebar-bottom"><a class="btn ghost" style="width:100%" href="logout.php">Sign out</a></div></aside>
 <main class="main"><div class="main-head"><div><h1>Add employee</h1><p style="color:var(--muted);margin:6px 0 0">Create an approved employee record directly from existing company information.</p></div></div>
 <?php if($flash):?><div class="alert <?=e($flash['type'])?>"><?=e($flash['message'])?></div><?php endif;?>

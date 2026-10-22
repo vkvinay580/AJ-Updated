@@ -1,4 +1,4 @@
-const CONTACT_API_URL = process.env.ARYAN_GOLD_CONTACTS_API_URL ?? "http://aryangoldbuyers.com/api/contacts";
+const CONTACT_API_URL = process.env.ARYAN_GOLD_CONTACTS_API_URL ?? "https://aryangoldbuyers.com/api/contacts";
 
 type ContactRequest = {
   name?: unknown;
@@ -42,8 +42,11 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         name,
         mobile,
+        city: "",
         weight,
-        businessType: "aryangold popup",
+        preferredDate: "",
+        preferredTime: "",
+        businessType: "Banner Form",
       }),
       cache: "no-store",
       signal: controller.signal,

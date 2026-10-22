@@ -14,30 +14,26 @@ In **cPanel → Setup Node.js App**:
 
 Upload `aryan-gold-cpanel.zip` into the application root and extract it there.
 
-## 2. Add environment variables
+## 2. Configure Vault and non-secret environment variables
 
-Use the Node.js application's environment-variable interface. Copy the names from `.env.production.example` and set:
+Provision the `aryan-business` AppRole as described in [VAULT_OPERATIONS.md](./VAULT_OPERATIONS.md). Store its role ID and secret ID in `/home/admin1/.config/aryangold-vault/business/` with directory mode `700` and file mode `600`. Put database, encryption, integration, bootstrap-user, and Verification Firebase secrets at `secret/apps/business`.
+
+Use `.env.production` only for non-secret runtime settings:
 
 - `NODE_ENV` = `production`
 - `HOSTNAME` = `0.0.0.0`
 - `NEXT_PUBLIC_SITE_URL` = `https://aryangold.in`
-- `DB_HOST` = `localhost`
-- `DB_PORT` = `3306`
-- `DB_USER` = the assigned cPanel database user
-- `DB_PASSWORD` = the database password (do not store it in a public file)
-- `DB_NAME` = the assigned cPanel database name
 - `DB_CONNECTION_LIMIT` = `10`
 - `DB_SSL` = `false`
-- `DATA_ENCRYPTION_KEY` = a new random secret of at least 32 characters
-- `INITIAL_ADMIN_EMAIL` = the desired admin email
-- `INITIAL_ADMIN_PASSWORD` = a new strong admin password
 - `ATTENDANCE_API_URL` = `https://attendance.aryangold.in/api`
-- `ATTENDANCE_INTEGRATION_KEY` = a long random secret shared only with the Attendance backend
 - `BRANCH_PORTAL_URL` = `https://biz.aryangold.in`
+- `VAULT_REQUIRED` = `true`
+- `VAULT_ADDR` = `http://127.0.0.1:8200`
+- `VAULT_SECRET_PATH` = `secret/data/apps/business`
 
 `NEXT_PUBLIC_SITE_URL` and `BRANCH_PORTAL_URL` are trusted browser origins for API CSRF checks. Enter origins only—HTTPS scheme and hostname, with no page path, username, password, or trailing application route—and restart the Node.js application after changing either value.
 
-Keep `DATA_ENCRYPTION_KEY` permanently backed up. Changing or losing it makes stored Aadhaar/PAN values unreadable.
+Keep the Vault data and unseal shares backed up separately. Never rotate `DATA_ENCRYPTION_KEY` without a data re-encryption migration; changing or losing it makes stored Aadhaar/PAN values unreadable.
 
 ## 3. Install, initialize, and build
 
@@ -53,31 +49,35 @@ The setup command creates all tables, registers Aryan Gold, Aryan Jewels, and La
 
 ## 4. Start the application
 
-Click **Restart Application** in cPanel. Then verify:
+Install and enable `aryangold.service` from the Vault deployment bundle. It starts the Node app with `VAULT_REQUIRED=true` and retries after a reboot until Vault is manually unsealed. Do not retain the older `@reboot npm start` cron entry. Then verify:
 
 - `https://aryangold.in`
 - `https://aryangold.in/contact`
 - `https://aryangold.in/admin/login`
 - `https://biz.aryangold.in` (map this subdomain to the same Node.js application)
 
-Deploy the Laravel Attendance app at `https://attendance.aryangold.in` and set its `ARYANGOLD_BUSINESS_INTEGRATION_KEY` to the same secret. The browser never calls this integration directly; AJ performs all employee, assignment, and login verification server-to-server.
+Deploy the Laravel Attendance app at `https://attendance.aryangold.in` and store its `ARYANGOLD_BUSINESS_INTEGRATION_KEY` in the Attendance Vault path with the same value as `ATTENDANCE_INTEGRATION_KEY` in the business path. The browser never calls this integration directly; AJ performs all employee, assignment, and login verification server-to-server.
 
 When cPanel requires the Attendance document root to live below the main `public_html` directory, retain the repository's root `.htaccess` host exclusion for `attendance.aryangold.in`. It prevents the main Next.js reverse proxy from intercepting Laravel requests while leaving `aryangold.in` and `biz.aryangold.in` on the Node.js application. The root and Laravel `public/.htaccess` files redirect public requests to HTTPS while keeping HTTP ACME challenge paths available for certificate renewal.
 
 Before deploying either application, create DNS records and AutoSSL certificates for `aryangold.in`, `attendance.aryangold.in`, and `biz.aryangold.in`. The attendance and branch subdomains will not work until those records resolve to the hosting account.
 
-For Attendance, copy the variable names from `Attendance app/Backend/.env.production.example` into the hosting environment, set the assigned production database name/user/password, preserve the existing `APP_KEY`, and run:
+For Attendance, provision the independently scoped `aryan-attendance` AppRole and put its secrets at `secret/apps/attendance`. Keep only the non-secret names from `Attendance app/Backend/.env.production.example` in `.env`; the Vault loader runs before Laravel reads environment configuration. Then run:
 
 ```bash
 composer install --no-dev --optimize-autoloader
 php artisan optimize:clear
 php artisan migrate --force
-php artisan config:cache
+php artisan config:clear
 php artisan route:cache
 php artisan view:cache
 ```
 
+Do not run `php artisan config:cache` with Vault-backed configuration: Laravel would serialize resolved secret values into `bootstrap/cache/config.php`. The small loopback Vault read therefore occurs during each PHP request; route and view caches remain enabled.
+
 Verify `https://attendance.aryangold.in/api/app/update` before distributing the Attendance APK. The AJ database and Attendance database remain separate; back up both before applying schema changes.
+
+Legacy outbound employee sync remains disabled unless `ARYANGOLD_EMPLOYEE_SYNC_URL` is explicitly configured. If it is required, provision the separate `aryan-employee-sync` AppRole and `secret/apps/employee-sync` path for the receiver's database credentials and a newly generated `ARYANGOLD_EMPLOYEE_SYNC_TOKEN`; store that same new token in the Attendance path. Never reuse the token removed from repository history.
 
 Enable **AutoSSL** for the domain before accepting real KYC documents. Camera capture requires HTTPS on deployed sites.
 
@@ -91,7 +91,7 @@ Recommended permissions are `750` for `storage` and its subdirectories, subject 
 
 For an existing installation, run `node scripts/setup-verification.mjs` before activating the new code to add only the eight verification tables in `database/schema.sql`. Fresh installations use `npm run db:setup`. Run `npm install` so the production package contains the ffprobe binary used to validate visit videos. Include the schema file and `public/downloads/aryan-verification.apk` in the deployment package. Confirm the download card on `https://aryangold.in/login` and APK at `https://aryangold.in/downloads/aryan-verification.apk` after restarting.
 
-For instant FCM notifications, set `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY` from a service account authorized for Firebase Cloud Messaging, and build the app with the matching public Android Firebase configuration described in `verification_app/README.md`. Never bundle the service-account key in the APK or Git. Without FCM configuration, Android background work periodically checks assignments; timing depends on connectivity and battery restrictions.
+For instant FCM notifications, store `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY` in the business Vault path. Attendance stores the complete service-account JSON as `FIREBASE_SERVICE_ACCOUNT_JSON` in its own Vault path. Build each app with the matching public Android Firebase configuration described in `verification_app/README.md`. Never bundle a service-account key in an APK, Git, `.env`, or a standalone production JSON file. Without FCM configuration, Android background work periodically checks assignments; timing depends on connectivity and battery restrictions.
 
 Allow request bodies of at least 42 MB for verification uploads (up to 12 images at 8 MB each, one compressed two-minute MP4 at 25 MB, and 40 MB total per submission). Check the full workflow using dedicated test accounts: create TE, assign customer in billing, receive assignment, submit both outcomes with photo/video evidence, inspect KYC playback, and check the requesting BM's notification. Verification photographs and videos remain behind authenticated routes.
 

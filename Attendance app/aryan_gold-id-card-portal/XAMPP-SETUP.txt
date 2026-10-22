@@ -30,11 +30,11 @@ Database: aryan_gold_id_portal
 Username: root
 Password: blank
 
-These settings are already configured in config.php.
+These settings are available only for local testing with VAULT_ENABLED=false.
 
 TROUBLESHOOTING
 ---------------
-- If MySQL uses a password, edit config.php and set the value under db > pass.
+- If MySQL uses a password, set DB_PASSWORD in the local Apache/PHP process environment; do not write it into config.php.
 - If the folder name changes, update base_url in config.php.
 - If Apache uses another port, use a URL such as http://localhost:8080/aryan_gold-id-card-portal/.
 - Enable the PHP extensions pdo_mysql and fileinfo in XAMPP if they are disabled.

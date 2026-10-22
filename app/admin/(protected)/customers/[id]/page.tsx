@@ -17,6 +17,7 @@ import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useRealtimeData } from "@/components/realtime/RealtimeSync";
+import VerificationDetailsModal from "@/components/verification/VerificationDetailsModal";
 const money = (p: number) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(
     p / 100,
@@ -76,6 +77,10 @@ type Data = {
     employerName?: string;
     employerAddress?: string;
     employmentDesignation?: string;
+    recommendationName?: string;
+    recommendationRelationship?: string;
+    recommendationPhone?: string;
+    recommendationAddress?: string;
     hasCompanyIdCard?: number;
     hasOldGoldWearingImage?: number;
     createdAt: string;
@@ -106,6 +111,7 @@ export default function CustomerDetailPage() {
   const [data, setData] = useState<Data | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
+  const [verificationId, setVerificationId] = useState<number | null>(null);
   const load = useCallback(async () => {
     const response = await fetch(`/api/admin/customers/${id}`, {
       cache: "no-store",
@@ -293,6 +299,15 @@ export default function CustomerDetailPage() {
             </div>
           </div>
         </section>
+        <section className="panel detail-card">
+          <h2>Recommendation / relative</h2>
+          <dl>
+            <div><dt>Name</dt><dd>{c.recommendationName || "Not provided"}</dd></div>
+            <div><dt>Relationship</dt><dd>{c.recommendationRelationship || "Not provided"}</dd></div>
+            <div><dt>Phone</dt><dd>{c.recommendationPhone ? `+91 ${c.recommendationPhone}` : "Not provided"}</dd></div>
+            <div className="full"><dt>Address</dt><dd>{c.recommendationAddress || "Not provided"}</dd></div>
+          </dl>
+        </section>
       </div>
       <section className="panel verification-history">
         <div className="panel-heading">
@@ -331,6 +346,7 @@ export default function CustomerDetailPage() {
                       </p>
                     </div>
                     <UserCheck />
+                    <button className="table-action" type="button" onClick={() => setVerificationId(v.id)}>Verification details</button>
                   </header>
                   <div className="verification-result-grid">
                     <dl>
@@ -453,6 +469,7 @@ export default function CustomerDetailPage() {
           </div>
         )}
       </section>
+      {verificationId && <VerificationDetailsModal requestId={verificationId} onClose={() => setVerificationId(null)} onViewed={() => void load()} />}
       <section className="panel list-panel">
         <div className="panel-heading">
           <div>

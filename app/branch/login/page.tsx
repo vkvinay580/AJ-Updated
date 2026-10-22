@@ -25,7 +25,7 @@ export default function BranchLoginPage() {
     }
   }
   return <div className="branch-login-page">
-    <section className="branch-login-brand"><div><Image src="/brands/aryan-gold.png" alt="Aryan Gold" width={120} height={120}/><span><ShieldCheck/> Branch operations</span><h1>Every branch.<br/><em>One trusted ledger.</em></h1><p>Securely manage customers, gold purchases, fund requests, expenses, transit, and your end-of-day closing.</p></div></section>
+    <section className="branch-login-brand"><div><Image src="/brands/aryan-gold.webp" alt="Aryan Gold" width={120} height={120}/><span><ShieldCheck/> Branch operations</span><h1>Every branch.<br/><em>One trusted ledger.</em></h1><p>Securely manage customers, gold purchases, fund requests, expenses, transit, and your end-of-day closing.</p></div></section>
     <section className="branch-login-form"><form onSubmit={submit}><div className="branch-login-mark"><Building2/></div><p>ARYAN GOLD BRANCHES</p><h2>Sign in to your branch</h2><span>Use the branch and employee credentials assigned by your administrator.</span>
       <label>Branch ID<input name="branchId" autoCapitalize="characters" autoCorrect="off" spellCheck={false} placeholder="AGBPL001" onInput={event=>{event.currentTarget.value=event.currentTarget.value.toUpperCase()}} required/></label>
       <label>Employee ID<input name="employeeId" type="text" inputMode="numeric" pattern="[0-9]+" autoComplete="username" placeholder="Employee ID" onInput={event=>{event.currentTarget.value=event.currentTarget.value.replace(/\D/g,"")}} required/></label>

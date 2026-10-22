@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $submission->emp_id }} ID Card</title>
+    <link rel="icon" href="{{ \App\Support\ProjectAsset::url('admin/assets/images/aryan_gold_favicon.png') }}?v=3" type="image/png">
     @include('admin.id_cards.partials.card_styles')
     <style>
         @page {

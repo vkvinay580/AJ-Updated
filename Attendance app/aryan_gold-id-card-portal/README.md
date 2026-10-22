@@ -29,13 +29,13 @@ A responsive PHP + MySQL portal for collecting employee details, reviewing submi
 4. Create the administrator account. The installer creates the configured database and tables automatically.
 5. Log in at `http://localhost/aryan_gold-id-card-portal/admin/login.php`.
 
-The included `config.php` uses the standard XAMPP MySQL defaults: user `root` with a blank password.
+The included `config.php` uses the standard XAMPP MySQL defaults only when `VAULT_ENABLED=false` is explicitly set for local testing: user `root` with a blank password. If local MySQL uses a password, provide `DB_PASSWORD` through the local process environment; do not write it into `config.php`.
 
 ## Installation
 
 1. Upload the project to your hosting, for example `public_html/id-card/`.
 2. Create a MySQL database and user in cPanel.
-3. Edit `config.php` with the database credentials and correct `base_url`.
+3. Provision the `id-card-portal` Vault AppRole and store `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, and `DB_PASSWORD` at `secret/apps/id-card-portal`; edit only the non-secret `base_url` and company details in `config.php`. Set `VAULT_REQUIRED=true` in the production PHP environment.
 4. Open `https://yourdomain.com/id-card/install.php`.
 5. Create the first administrator account.
 6. Delete `install.php` after successful setup.
@@ -46,7 +46,7 @@ Alternatively, import `database.sql` in phpMyAdmin, then run `install.php` to cr
 
 ## Branding
 
-- Replace `assets/img/logo.svg` with the official company logo while keeping the same filename, or update the image paths.
+- The bundled `assets/img/aryan_gold-logo.png`, `aryan_gold-logo-official.png`, `favicon.png`, and `logo.svg` wrapper use the official Aryan Gold mark from `aryangoldbuyers.com`.
 - Edit company address, website and emergency phone in `config.php`.
 - Modify card colors in `assets/css/app.css` under `:root`.
 
@@ -55,7 +55,7 @@ Alternatively, import `database.sql` in phpMyAdmin, then run `install.php` to cr
 - Force HTTPS.
 - Use a dedicated database user with only required privileges.
 - Delete `install.php` after setup.
-- Keep `config.php` outside the public web root where your hosting permits it.
+- Keep AppRole bootstrap files owner-only under `~/.config/aryangold-vault/id-card-portal`; `config.php` contains no production password.
 - Add server-side backups for the database and `uploads/photos`.
 - Confirm employee consent and retention policy with HR/legal.
 - Consider adding role-based access, audit logs and encrypted backups before large-scale use.

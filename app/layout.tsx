@@ -45,23 +45,18 @@ export const metadata: Metadata = {
     siteName: "Aryan Gold",
     title: "Aryan Gold | Gold & Silver Buyers in Bengaluru",
     description: "Buy and sell gold and silver with transparent valuation, secure transactions, and professional service in Bengaluru.",
-    images: [{ url: "/brands/aryan-gold.png", alt: "Aryan Gold" }],
+    images: [{ url: "/brands/aryan-gold.webp", alt: "Aryan Gold" }],
   },
   twitter: {
     card: "summary",
     title: "Aryan Gold | Gold & Silver Buyers in Bengaluru",
     description: "Transparent gold and silver buying, selling, and valuation in Bengaluru.",
-    images: ["/brands/aryan-gold.png"],
+    images: ["/brands/aryan-gold.webp"],
   },
   robots: {
     index: true,
     follow: true,
     googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 },
-  },
-  icons: {
-    icon: "/brands/aryan-gold.png",
-    shortcut: "/brands/aryan-gold.png",
-    apple: "/brands/aryan-gold.png",
   },
 };
 

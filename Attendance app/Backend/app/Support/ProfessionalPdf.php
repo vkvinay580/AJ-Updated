@@ -8,7 +8,10 @@ final class ProfessionalPdf
 
     private const PAGE_HEIGHT = 841.89;
 
-    private string $content = '';
+    /** @var array<int, string> */
+    private array $pages = [''];
+
+    private int $pageIndex = 0;
 
     private float $cursorY = 132.0;
 
@@ -92,6 +95,39 @@ final class ProfessionalPdf
         return $this;
     }
 
+    public function clauses(array $clauses): self
+    {
+        foreach (array_values($clauses) as $index => $clause) {
+            $number = (string) ($clause['number'] ?? ($index + 1).'.');
+            $title = trim((string) ($clause['title'] ?? ''));
+            $body = trim((string) ($clause['body'] ?? ''));
+
+            $this->text($number, 54, $this->cursorY, 9.5, true, [0.0, 0.416, 0.392]);
+            $this->text($title, 76, $this->cursorY, 9.5, true, [0.12, 0.15, 0.14]);
+            $this->cursorY += 14;
+
+            foreach ($this->wrap($body, 88) as $line) {
+                $this->text($line, 76, $this->cursorY, 9.2, false, [0.18, 0.21, 0.20]);
+                $this->cursorY += 13;
+            }
+
+            $this->cursorY += 7;
+        }
+
+        return $this;
+    }
+
+    public function pageBreak(string $heading, ?string $subtitle = null): self
+    {
+        $this->drawFooter();
+        $this->pages[] = '';
+        $this->pageIndex++;
+        $this->cursorY = 132.0;
+        $this->drawHeader();
+
+        return $this->heading($heading, $subtitle);
+    }
+
     public function table(array $headers, array $rows, array $widths, array $alignments = []): self
     {
         $x = 54.0;
@@ -146,28 +182,46 @@ final class ProfessionalPdf
     {
         $this->drawFooter();
 
-        $pageResources = '/Font << /F1 4 0 R /F2 5 0 R >>';
+        $pageCount = count($this->pages);
+        $regularFontId = 3 + $pageCount;
+        $boldFontId = $regularFontId + 1;
+        $firstContentId = $boldFontId + 1;
+        $infoId = $firstContentId + $pageCount;
+        $logoId = $infoId + 1;
+        $maskId = $logoId + 1;
+
+        $pageResources = "/Font << /F1 {$regularFontId} 0 R /F2 {$boldFontId} 0 R >>";
         if ($this->logo !== null) {
-            $pageResources .= ' /XObject << /ImLogo 8 0 R >>';
+            $pageResources .= " /XObject << /ImLogo {$logoId} 0 R >>";
         }
 
+        $pageIds = range(3, 2 + $pageCount);
         $objects = [
             '<< /Type /Catalog /Pages 2 0 R >>',
-            '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-            sprintf(
-                '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %.2F %.2F] /Resources << %s >> /Contents 6 0 R >>',
-                self::PAGE_WIDTH,
-                self::PAGE_HEIGHT,
-                $pageResources
-            ),
-            '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
-            '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>',
-            '<< /Length '.strlen($this->content)." >>\nstream\n".$this->content.'endstream',
-            '<< /Title ('.$this->escape($this->documentTitle).') /Author (Aryan Attendance Application) /Creator (Aryan Attendance Application) >>',
+            '<< /Type /Pages /Kids ['.implode(' ', array_map(fn (int $id) => "{$id} 0 R", $pageIds))."] /Count {$pageCount} >>",
         ];
 
+        foreach (array_keys($pageIds) as $index) {
+            $objects[] = sprintf(
+                '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %.2F %.2F] /Resources << %s >> /Contents %d 0 R >>',
+                self::PAGE_WIDTH,
+                self::PAGE_HEIGHT,
+                $pageResources,
+                $firstContentId + $index
+            );
+        }
+
+        $objects[] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
+        $objects[] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
+
+        foreach ($this->pages as $content) {
+            $objects[] = '<< /Length '.strlen($content)." >>\nstream\n".$content.'endstream';
+        }
+
+        $objects[] = '<< /Title ('.$this->escape($this->documentTitle).') /Author (Aryan Attendance Application) /Creator (Aryan Attendance Application) >>';
+
         if ($this->logo !== null) {
-            $softMask = $this->logo['alpha'] !== null ? ' /SMask 9 0 R' : '';
+            $softMask = $this->logo['alpha'] !== null ? " /SMask {$maskId} 0 R" : '';
             $objects[] = sprintf(
                 "<< /Type /XObject /Subtype /Image /Width %d /Height %d /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode%s /Length %d >>\nstream\n%s\nendstream",
                 $this->logo['width'],
@@ -202,7 +256,7 @@ final class ProfessionalPdf
             $pdf .= sprintf("%010d 00000 n \n", $offset);
         }
 
-        $pdf .= 'trailer << /Size '.(count($objects) + 1).' /Root 1 0 R /Info 7 0 R >>'."\n";
+        $pdf .= 'trailer << /Size '.(count($objects) + 1)." /Root 1 0 R /Info {$infoId} 0 R >>\n";
         $pdf .= "startxref\n{$xrefOffset}\n%%EOF";
 
         return $pdf;
@@ -237,7 +291,7 @@ final class ProfessionalPdf
     {
         $font = $bold ? 'F2' : 'F1';
         $pdfY = self::PAGE_HEIGHT - $y;
-        $this->content .= sprintf(
+        $this->pages[$this->pageIndex] .= sprintf(
             "BT /%s %.2F Tf %.3F %.3F %.3F rg 1 0 0 1 %.2F %.2F Tm (%s) Tj ET\n",
             $font,
             $size,
@@ -271,18 +325,18 @@ final class ProfessionalPdf
     {
         $pdfY = self::PAGE_HEIGHT - $y - $height;
         if ($fill !== null) {
-            $this->content .= sprintf('%.3F %.3F %.3F rg ', $fill[0], $fill[1], $fill[2]);
+            $this->pages[$this->pageIndex] .= sprintf('%.3F %.3F %.3F rg ', $fill[0], $fill[1], $fill[2]);
         }
         if ($stroke !== null) {
-            $this->content .= sprintf('%.3F %.3F %.3F RG ', $stroke[0], $stroke[1], $stroke[2]);
+            $this->pages[$this->pageIndex] .= sprintf('%.3F %.3F %.3F RG ', $stroke[0], $stroke[1], $stroke[2]);
         }
         $operator = $fill !== null && $stroke !== null ? 'B' : ($fill !== null ? 'f' : 'S');
-        $this->content .= sprintf("%.2F %.2F %.2F %.2F re %s\n", $x, $pdfY, $width, $height, $operator);
+        $this->pages[$this->pageIndex] .= sprintf("%.2F %.2F %.2F %.2F re %s\n", $x, $pdfY, $width, $height, $operator);
     }
 
     private function line(float $x1, float $y1, float $x2, float $y2, array $color, float $width): void
     {
-        $this->content .= sprintf(
+        $this->pages[$this->pageIndex] .= sprintf(
             "%.3F %.3F %.3F RG %.2F w %.2F %.2F m %.2F %.2F l S\n",
             $color[0],
             $color[1],
@@ -298,7 +352,7 @@ final class ProfessionalPdf
     private function image(string $name, float $x, float $y, float $width, float $height): void
     {
         $pdfY = self::PAGE_HEIGHT - $y - $height;
-        $this->content .= sprintf(
+        $this->pages[$this->pageIndex] .= sprintf(
             "q %.2F 0 0 %.2F %.2F %.2F cm /%s Do Q\n",
             $width,
             $height,

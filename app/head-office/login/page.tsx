@@ -27,7 +27,7 @@ export default function HeadOfficeLoginPage() {
   }
   return <div className="ho-login-page">
     <section className="ho-login-story"><div className="ho-story-glow"/><div className="ho-story-inner">
-      <Image src="/brands/aryan-gold.png" alt="Aryan Gold" width={84} height={84} priority/>
+      <Image src="/brands/aryan-gold.webp" alt="Aryan Gold" width={84} height={84} priority/>
       <span className="security-pill"><ShieldCheck/> Secure Head Office</span>
       <h1>Every ornament.<br/><em>Precisely accounted.</em></h1>
       <p>A focused workspace for packet receipt, weight audit, melt grouping, and Gatti completion.</p>

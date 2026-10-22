@@ -22,8 +22,8 @@ add live push updates to screens that are already open.
   server-generated invoice instead.
 - Android back navigation, tap-to-retry connection failure feedback, persistent
   sign-in cookies, and support for simultaneous website/app sessions.
-- Full-screen website without Home, Reload, or Server buttons, plus the website's
-  original AG favicon as the adaptive launcher icon.
+- Full-screen website without Home, Reload, or Server buttons, plus the canonical
+  `aryangoldbuyers.com` Aryan Gold mark as the adaptive launcher icon.
 - **Save password in this app** remembers the last successfully used email,
   password and company on this device. Android Keystore AES-GCM encryption protects
   the saved entry in app-private, non-backed-up storage. The login form fills it
@@ -66,7 +66,7 @@ an HTTPS origin. Repeat `adb reverse` after restarting the emulator.
 For distribution, use Android Studio **Build > Generate Signed App Bundle / APK**
 and create/store your own release signing key securely. The debug APK is for
 testing and is not a Play Store release. WebView debugging is disabled in all
-builds. Release builds block cleartext HTTP. Version 1.3.0 (code 4) updates the previous APK in place
+builds. Release builds block cleartext HTTP. Version 1.3.1 (code 5) updates the previous APK in place
 when signed with the same key.
 
 ## Deploy the website integration

@@ -78,4 +78,17 @@ class EmployeeDocumentPdfTest extends TestCase
         $this->assertStringContainsString('NET PAYABLE', $pdf);
         $this->assertStringContainsString('INR 40,450.00', $pdf);
     }
+
+    public function test_offer_letter_contains_three_month_probation_and_employment_terms(): void
+    {
+        $pdf = app(EmployeeDocumentPdfFactory::class)->offerLetter($this->employee, 45000);
+
+        $this->assertStringContainsString('/Count 2', $pdf);
+        $this->assertStringContainsString('Probationary period', $pdf);
+        $this->assertStringContainsString('3 months from date of joining', $pdf);
+        $this->assertStringContainsString('Terms and Conditions', $pdf);
+        $this->assertStringContainsString('CODE OF CONDUCT', $pdf);
+        $this->assertStringContainsString('Confidentiality and work product', $pdf);
+        $this->assertStringContainsString('Discipline and separation', $pdf);
+    }
 }

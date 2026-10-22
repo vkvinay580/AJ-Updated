@@ -52,7 +52,7 @@ export default function ChatDock({ scope }:{ scope:ChatScope }) {
     setToast({id:latest.id,name:latest.senderName});
     playNotificationSound();
     if(typeof Notification!=="undefined"&&Notification.permission==="granted"){
-      try{new Notification(`Message from ${latest.senderName}`,{body:"You have a new chat message.",icon:"/brands/aryan-gold.png",tag:`chat-${latest.id}`});}catch{/* In-app notifications remain available where native browser notifications are restricted. */}
+      try{new Notification(`Message from ${latest.senderName}`,{body:"You have a new chat message.",icon:"/brands/aryan-gold.webp",tag:`chat-${latest.id}`});}catch{/* In-app notifications remain available where native browser notifications are restricted. */}
     }
   },[playNotificationSound]);
 

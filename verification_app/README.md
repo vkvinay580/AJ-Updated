@@ -1,6 +1,14 @@
 # Aryan Verification
 
-Android application for admin-created TE accounts. A branch manager assigns a customer from billing; the TE sees customer address/contact details and the requesting BM's name/mobile, records a home visit with multiple photos, an optional compressed video, references and an authentication person, and submits **Verified** or **Could not be verified**. Results and protected evidence appear in customer KYC. The requesting BM receives an in-app result notification.
+The app checks `/api/verification/app-update` when it launches and whenever it
+returns to the foreground. If its build number is below `minimumVersionCode`,
+all app access is blocked until the current APK is installed. For every app
+release, increment the version/build in `pubspec.yaml` and update
+`lib/verification-app-release.ts` to the same values before publishing the APK.
+
+Android application for admin-created TE accounts. A branch manager assigns a customer from billing; the TE sees customer address/contact details and the requesting BM's name/mobile, records a home visit with GPS-tagged photos and video, references and an authentication person, and submits **Verified** or **Could not be verified**. Each completed app section shows a checkmark. Results and protected evidence appear in customer KYC, the approval desk, and the requesting BM's details popup.
+
+The in-app brand mark and every Android launcher density use the canonical square Aryan Gold logo published at `https://aryangoldbuyers.com/aryan-mark.webp`. Keep `assets/images/aryan_gold_logo.png` and the `mipmap-*` launcher files synchronized when the official mark changes.
 
 ## Build and distribute
 
@@ -34,9 +42,9 @@ For non-Android builds or CI environments without `google-services.json`, the sa
 - Admin creates TE user ID/password and can enable or disable access.
 - BM can assign a TE while registering a new customer or later from billing, and supplies a contact mobile/instructions. Customer registration and its optional initial assignment are committed together. Only one active request is allowed per customer; billing is not blocked.
 - TE signs in, opens an assignment, calls customer/BM if needed, and starts the visit.
-- Verified requires at least two photos, one reference with a valid mobile, and authentication person's name/mobile. Up to 12 photos and 10 references are accepted; images are limited to 8 MB each. Could-not-verify requires a reason.
+- Verified requires at least two photos, one reference with a valid mobile, and authentication person's name/mobile. Every captured photo/video includes its current Google location and capture time. Up to 12 photos and 10 references are accepted; images are limited to 8 MB each. Could-not-verify requires a reason.
 - One optional visit video can be recorded from the camera for up to two minutes. The app compresses it to 640×480 at 24 fps before upload; the compressed MP4 is limited to 25 MB and all evidence in one submission is limited to 40 MB. The API independently validates MP4/H.264 format, duration, resolution, and size with the bundled ffprobe binary.
-- Completed requests cannot be resubmitted. Photos and videos are stored privately in `storage/verification`; company-authenticated administrators can play the video and see the result, references and evidence under KYC.
+- Completed requests cannot be resubmitted. Photos and videos are stored privately in `storage/verification`; authorized branch managers, floor users, and administrators can open the full result popup. Floor approval is blocked until a requested verification is complete and that floor user has viewed it.
 - TE sessions expire after 30 days and are invalidated when admin disables the account or resets its password.
 
 The backend endpoints are `/api/verification/login`, `/session`, `/device`, and `/requests` under `/api/verification`. They use TE bearer credentials and scope assignments to the logged-in TE. Schema lives in `../database/schema.sql`.

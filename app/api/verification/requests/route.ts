@@ -40,6 +40,17 @@ type ReferenceInput = {
   notes?: unknown;
 };
 
+type EvidenceMetadataInput = { latitude?: unknown; longitude?: unknown; capturedAt?: unknown };
+
+function evidenceMetadata(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const input = value as EvidenceMetadataInput;
+  const latitude = Number(input.latitude), longitude = Number(input.longitude);
+  const capturedAt = new Date(String(input.capturedAt || ""));
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180 || Number.isNaN(capturedAt.getTime())) return null;
+  return { latitude, longitude, capturedAt };
+}
+
 export async function POST(request: NextRequest) {
   const session = await getTeSession(request);
   if (!session) return apiError("Your TE session has expired.", 401);
@@ -164,6 +175,17 @@ export async function POST(request: NextRequest) {
     40 * 1024 * 1024
   )
     return apiError("Photos and video together must be 40 MB or smaller.");
+  let rawPhotoMetadata: unknown = [], rawVideoMetadata: unknown = null;
+  try {
+    rawPhotoMetadata = JSON.parse(String(form.get("photoMetadata") || "[]"));
+    rawVideoMetadata = JSON.parse(String(form.get("videoMetadata") || "null"));
+  } catch { return apiError("Invalid evidence location details."); }
+  const photoMetadata = Array.isArray(rawPhotoMetadata) ? rawPhotoMetadata.map(evidenceMetadata) : [];
+  const videoMetadata = evidenceMetadata(rawVideoMetadata);
+  if (photoFiles.length && (photoMetadata.length !== photoFiles.length || photoMetadata.some(item => !item)))
+    return apiError("Every verification photo must include its captured Google location.");
+  if (videoFiles.length && !videoMetadata)
+    return apiError("The verification video must include its captured Google location.");
   const item = await one<RowDataPacket>(
     `SELECT r.id,r.status,r.branch_id AS branchId,r.bm_employee_id AS bmEmployeeId,c.name AS customerName
     FROM customer_verification_requests r JOIN customers c ON c.id=r.customer_id WHERE r.id=? AND r.te_user_id=?`,
@@ -190,6 +212,7 @@ export async function POST(request: NextRequest) {
         connection,
       );
       if (!locked) throw new Error("ALREADY_COMPLETE");
+      const finalEvidenceLocation = videoMetadata || photoMetadata.at(-1);
       await execute(
         `UPDATE customer_verification_requests SET status=?,authentication_person_name=?,authentication_person_relationship=?,
         authentication_person_phone=?,verification_notes=?,failure_reason=?,latitude=?,longitude=?,started_at=COALESCE(started_at,UTC_TIMESTAMP()),completed_at=UTC_TIMESTAMP()
@@ -201,12 +224,8 @@ export async function POST(request: NextRequest) {
           authenticationPersonPhone || null,
           verificationNotes || null,
           failureReason || null,
-          latitude && Number.isFinite(Number(latitude))
-            ? Number(latitude)
-            : null,
-          longitude && Number.isFinite(Number(longitude))
-            ? Number(longitude)
-            : null,
+          finalEvidenceLocation?.latitude ?? (latitude && Number.isFinite(Number(latitude)) ? Number(latitude) : null),
+          finalEvidenceLocation?.longitude ?? (longitude && Number.isFinite(Number(longitude)) ? Number(longitude) : null),
           id,
         ],
         connection,
@@ -229,17 +248,19 @@ export async function POST(request: NextRequest) {
           ],
           connection,
         );
-      for (const photo of stored)
+      for (const [index, photo] of stored.entries()) {
+        const metadata = photoMetadata[index];
         await execute(
           `INSERT INTO customer_verification_photos
-        (request_id,file_path,original_name,mime_type) VALUES (?,?,?,?)`,
-          [id, photo.path, photo.name, photo.mime],
+        (request_id,file_path,original_name,mime_type,latitude,longitude,captured_at) VALUES (?,?,?,?,?,?,?)`,
+          [id, photo.path, photo.name, photo.mime, metadata?.latitude ?? null, metadata?.longitude ?? null, metadata?.capturedAt ?? null],
           connection,
         );
+      }
       if (video)
         await execute(
-          `INSERT INTO customer_verification_videos (request_id,file_path,original_name,mime_type,duration_ms,byte_size)
-        VALUES (?,?,?,?,?,?)`,
+          `INSERT INTO customer_verification_videos (request_id,file_path,original_name,mime_type,duration_ms,byte_size,latitude,longitude,captured_at)
+        VALUES (?,?,?,?,?,?,?,?,?)`,
           [
             id,
             video.path,
@@ -247,6 +268,9 @@ export async function POST(request: NextRequest) {
             video.mime,
             video.durationMs,
             video.byteSize,
+            videoMetadata?.latitude ?? null,
+            videoMetadata?.longitude ?? null,
+            videoMetadata?.capturedAt ?? null,
           ],
           connection,
         );

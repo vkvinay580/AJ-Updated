@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <title>Remaining ID Card Submissions</title>
+    <link rel="icon" href="{{ \App\Support\ProjectAsset::url('admin/assets/images/aryan_gold_favicon.png') }}?v=3" type="image/png">
     <style>
         @page { size: A4 landscape; margin: 14mm; }
         * { box-sizing: border-box; }

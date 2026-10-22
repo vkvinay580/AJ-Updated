@@ -46,6 +46,10 @@ export async function POST(request: NextRequest) {
   const employerName = cleanText(form.get("employerName"), 190);
   const employerAddress = cleanText(form.get("employerAddress"), 500);
   const employmentDesignation = cleanText(form.get("employmentDesignation"), 120);
+  const recommendationName = cleanText(form.get("recommendationName"), 190);
+  const recommendationRelationship = cleanText(form.get("recommendationRelationship"), 120);
+  const recommendationPhone = cleanPhone(form.get("recommendationPhone"));
+  const recommendationAddress = cleanText(form.get("recommendationAddress"), 500);
   const requestHouseVerification = form.get("requestHouseVerification") === "1";
   const verificationTeUserId = Number(form.get("verificationTeUserId"));
   const verificationBmPhone = cleanPhone(form.get("verificationBmPhone"));
@@ -56,6 +60,8 @@ export async function POST(request: NextRequest) {
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return apiError("Enter a valid email address.");
   if (gstin && !/^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]$/.test(gstin)) return apiError("Enter a valid 15-character GSTIN.");
   if (stateCode && !/^\d{2}$/.test(stateCode)) return apiError("State code must contain 2 digits.");
+  if (recommendationName.length < 2 || !recommendationRelationship || recommendationPhone.length !== 10 || !recommendationAddress)
+    return apiError("Complete the recommendation or relative name, relationship, phone number, and address.");
 
   const branchSession = requestHouseVerification ? await getBranchSession() : null;
   if (requestHouseVerification && (!session.branchId || !session.employeeId || !branchSession)) return apiError("House verification can only be requested from an active branch session.", 403);
@@ -92,13 +98,15 @@ export async function POST(request: NextRequest) {
         (company_id, phone, name, email, address, city, state, gstin, state_code, place_of_supply, postal_code, customer_image_path,
           employer_name, employer_address, employment_designation, company_id_card_path, company_id_card_original_name, company_id_card_mime_type,
           old_gold_wearing_image_path, old_gold_wearing_image_original_name, old_gold_wearing_image_mime_type,
+          recommendation_name, recommendation_relationship, recommendation_phone, recommendation_address,
           origin_branch_id, created_by_employee_id, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [session.companyId, phone, name, email || null, address || null, city || null, state || null, gstin || null, stateCode || null, placeOfSupply || state || null, postalCode || null, storedCustomer?.path || null,
           employerName || null, employerAddress || null, employmentDesignation || null, storedCompanyId?.path || null,
           companyIdCard instanceof File && companyIdCard.size ? cleanText(companyIdCard.name, 255) : null, storedCompanyId?.mime || null,
           storedOldGoldWearingImage?.path || null,
           oldGoldWearingImage instanceof File && oldGoldWearingImage.size ? cleanText(oldGoldWearingImage.name, 255) : null, storedOldGoldWearingImage?.mime || null,
+          recommendationName, recommendationRelationship, recommendationPhone, recommendationAddress,
           session.branchId, session.employeeId, session.adminId], connection);
       const newCustomerId = result.insertId;
       if (session.branchId && session.employeeId) await execute(`INSERT INTO branch_customers

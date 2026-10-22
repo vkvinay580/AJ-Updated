@@ -15,7 +15,7 @@ if (!$emp) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ID Card - <?=e(mb_strtoupper((string)$emp['full_name'], 'UTF-8'))?></title>
+<link rel="icon" type="image/png" href="../assets/img/favicon.png?v=20261020"><title>ID Card - <?=e(mb_strtoupper((string)$emp['full_name'], 'UTF-8'))?></title>
 <link rel="stylesheet" href="../assets/css/app.css?v=<?=filemtime(dirname(__DIR__).'/assets/css/app.css')?>">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>

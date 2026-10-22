@@ -18,6 +18,7 @@ function isLiveWorkspace(pathname: string) {
 function usesClientDataRefresh(pathname: string) {
   return pathname === "/branch" || pathname === "/head-office" || pathname === "/accounts" ||
     pathname === "/admin/operations" || pathname === "/admin/verification" || pathname === "/admin/customers" ||
+    pathname === "/admin/verification-results" || pathname === "/branch/verifications" ||
     /^\/admin\/customers\/\d+$/.test(pathname) || pathname === "/admin/bills" || /^\/admin\/bills\/\d+$/.test(pathname);
 }
 

@@ -17,6 +17,10 @@
   border-bottom-color: rgba(224, 177, 58, .28);
 }
 
+.brand-lockup img {
+  border-radius: 0;
+}
+
 .brand-lockup small,
 .site-footer svg {
   color: var(--aryan-gold);

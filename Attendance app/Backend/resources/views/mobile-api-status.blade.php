@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Mobile API Status</title>
+    <link rel="icon" href="{{ \App\Support\ProjectAsset::url('admin/assets/images/aryan_gold_favicon.png') }}?v=3" type="image/png">
     <style>
         * { box-sizing: border-box; }
         body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; background: #f4f6f8; color: #17202a; font-family: Arial, sans-serif; }

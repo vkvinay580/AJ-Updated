@@ -14,7 +14,7 @@ export default function Header() {
   const links = [[aryanGoldBuyersLinks.services, "Services"], [aryanGoldBuyersLinks.branches, "Branches"], [aryanGoldBuyersLinks.howItWorks, "How it works"], [aryanGoldBuyersLinks.whyAryan, "Why Aryan Gold"], [aryanGoldBuyersLinks.contact, "Contact"]];
   return <header className="site-header">
     <div className="site-nav">
-      <Link href="/" className="brand-lockup" aria-label="Aryan Gold home"><Image src="/brands/aryan-gold.png" width={62} height={62} alt="Aryan Gold" priority /><span><b>ARYAN</b><small>GOLD</small></span></Link>
+      <Link href="/" className="brand-lockup" aria-label="Aryan Gold home"><Image src="/brands/aryan-gold.webp" width={62} height={62} alt="Aryan Gold" priority /><span><b>ARYAN</b><small>GOLD</small></span></Link>
       <nav className="desktop-nav" aria-label="Primary navigation">{links.map(([href, label]) => <a key={href} href={href}>{label}</a>)}<Link href="/login">Staff login</Link><a href={aryanGoldBuyersLinks.booking} className="gold-button small">Get a valuation</a></nav>
       <button className="menu-button" onClick={() => setOpen(!open)} aria-label="Toggle menu" aria-expanded={open}>{open ? <X /> : <Menu />}</button>
     </div>

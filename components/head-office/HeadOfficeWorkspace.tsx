@@ -60,7 +60,7 @@ export default function HeadOfficeWorkspace({ initialSession }: { initialSession
   const packetCount = new Set(pending.map(item => item.transactionId)).size;
   const openGroups = data.groups.filter(group => group.status === "created");
   return <div className="ho-app">
-    <header className="ho-topbar"><div className="ho-brand"><Image src="/brands/aryan-gold.png" alt="Aryan Gold" width={48} height={48}/><span><strong>Aryan Gold</strong><small>Head Office</small></span></div>
+    <header className="ho-topbar"><div className="ho-brand"><Image src="/brands/aryan-gold.webp" alt="Aryan Gold" width={48} height={48}/><span><strong>Aryan Gold</strong><small>Head Office</small></span></div>
       <div className="ho-user"><span className={`ho-role ${initialSession.role}`}>{initialSession.role === "auditor" ? <Scale/> : <Flame/>}{initialSession.role}</span><div><strong>{initialSession.name}</strong><small>@{initialSession.username}</small></div><button onClick={()=>setPasswordOpen(true)} aria-label="Change password"><KeyRound/></button><button onClick={logout} aria-label="Sign out"><LogOut/></button></div></header>
     <main className="ho-content">
       <section className="ho-heading"><div><p>{initialSession.role === "auditor" ? "RECEIPT & WEIGHT CONTROL" : "MELTING FLOOR"}</p><h1>{initialSession.role === "auditor" ? "Ornament audit desk" : "Gatti production desk"}</h1><span>{initialSession.role === "auditor" ? "Verify every branch packet before grouping ornaments for melting." : "Complete each prepared melt group with its final weights and purity."}</span></div><button className="ho-refresh" onClick={() => void load()}><RefreshCw/> Refresh</button></section>

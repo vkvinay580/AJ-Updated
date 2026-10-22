@@ -353,6 +353,18 @@ class FirebaseCloudMessagingService
         }
 
         $this->serviceAccountLoaded = true;
+        $inline = trim((string) config('services.fcm.service_account_json'));
+        if ($inline !== '') {
+            $decoded = json_decode($inline, true);
+            if (! is_array($decoded)) {
+                Log::warning('Firebase service account from Vault could not be decoded.');
+
+                return $this->serviceAccount = null;
+            }
+
+            return $this->serviceAccount = $decoded;
+        }
+
         $path = trim((string) config('services.fcm.service_account'));
 
         if ($path === '' || ! is_file($path)) {

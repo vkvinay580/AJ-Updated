@@ -5,6 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
         <title>Laravel</title>
+        <link rel="icon" href="{{ \App\Support\ProjectAsset::url('admin/assets/images/aryan_gold_favicon.png') }}?v=3" type="image/png">
 
         <!-- Fonts -->
         <link href="https://fonts.bunny.net/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">

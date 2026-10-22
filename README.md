@@ -19,7 +19,7 @@ A responsive gold-trading website and private, multi-company administration syst
 
 ## Run locally
 
-Node.js 22 and MySQL/MariaDB are recommended. Copy `.env.example` to `.env.local`, enter the local database settings, and then run:
+Node.js 22, MySQL/MariaDB, and HashiCorp Vault are recommended. Copy `.env.example` to `.env.local`, create a development AppRole with read-only access to `secret/data/apps/business`, place its role ID and secret ID in the documented owner-only files, and then run:
 
 ```bash
 npm install
@@ -33,23 +33,22 @@ The setup command creates the administrator specified by `INITIAL_ADMIN_EMAIL` a
 
 ## Production configuration
 
-Use environment variables instead of storing database credentials in source control. If an administrator already exists, rerunning `db:setup` does not overwrite its password.
+Production secrets are loaded from HashiCorp Vault before Next.js initializes. The active `.env.production` contains only public/runtime configuration and Vault connection metadata. If an administrator already exists, rerunning `db:setup` does not overwrite its password.
 
 ```text
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=your-database-user
-DB_PASSWORD=your-database-password
-DB_NAME=your-database-name
-DATA_ENCRYPTION_KEY=replace-with-a-long-random-secret
-INITIAL_ADMIN_EMAIL=your-admin@example.com
-INITIAL_ADMIN_PASSWORD=replace-with-a-strong-unique-password
+VAULT_ENABLED=true
+VAULT_REQUIRED=true
+VAULT_ADDR=http://127.0.0.1:8200
+VAULT_APPLICATION=business
+VAULT_SECRET_PATH=secret/data/apps/business
 NEXT_PUBLIC_SITE_URL=https://aryangold.in
 ATTENDANCE_API_URL=https://attendance.aryangold.in/api
 BRANCH_PORTAL_URL=https://biz.aryangold.in
 ```
 
-`NEXT_PUBLIC_SITE_URL` drives canonical metadata, the sitemap, robots file, and primary-site origin validation. `BRANCH_PORTAL_URL` is also included in the same-origin allowlist so browser POST requests from the mapped branch subdomain pass CSRF protection behind cPanel's reverse proxy. Both values must be HTTPS origins without paths or credentials. Create DNS and TLS for the attendance and branch subdomains before publishing the Android apps. The Attendance production database and Laravel settings are documented in `Attendance app/Backend/.env.production.example`; keep real credentials only in the hosting environment.
+The business Vault path owns database credentials, the data-encryption key, bootstrap role credentials, the Attendance integration key, and Verification Firebase server credentials. Attendance uses a separate AppRole and `secret/data/apps/attendance`. See [VAULT_OPERATIONS.md](./VAULT_OPERATIONS.md) for policy, bootstrap, rotation, outage, and recovery procedures. AppRole bootstrap files are revocable credentials—not application secrets—and must remain owner-only.
+
+`NEXT_PUBLIC_SITE_URL` drives canonical metadata, the sitemap, robots file, and primary-site origin validation. `BRANCH_PORTAL_URL` is also included in the same-origin allowlist so browser POST requests from the mapped branch subdomain pass CSRF protection behind cPanel's reverse proxy. Both values must be HTTPS origins without paths or credentials. Create DNS and TLS for the attendance and branch subdomains before publishing the Android apps. The Attendance production runtime settings are documented in `Attendance app/Backend/.env.production.example`; production secret values belong only in Vault.
 
 Back up the database, `storage/kyc`, `storage/pledges`, `storage/chat`, and `storage/verification` together. Customer KYC files, company ID cards, and old-gold wearing images are stored under `storage/kyc`; private documents, verification photos, and chat attachments are never placed in the public directory.
 

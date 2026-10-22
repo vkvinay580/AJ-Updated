@@ -29,7 +29,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Aryan Gold Admin Login</title>
     <!--favicon-->
-    <link rel="icon" href="{{ \App\Support\ProjectAsset::url('admin/assets/images/aryan_gold_favicon.png') }}?v=2" type="image/png">
+    <link rel="icon" href="{{ \App\Support\ProjectAsset::url('admin/assets/images/aryan_gold_favicon.png') }}?v=3" type="image/png">
     <!-- loader-->
     <link href="{{ \App\Support\ProjectAsset::url('admin/assets/css/pace.min.css') }}" rel="stylesheet">
     <script src="{{ \App\Support\ProjectAsset::url('admin/assets/js/pace.min.js') }}"></script>

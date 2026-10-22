@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Approved ID Card Submissions</title>
+    <link rel="icon" href="{{ \App\Support\ProjectAsset::url('admin/assets/images/aryan_gold_favicon.png') }}?v=3" type="image/png">
     @include('admin.id_cards.partials.card_styles')
     <style>
         @page { size: A4 landscape; margin: 0; }

@@ -1,12 +1,13 @@
 "use client";
 
-import { BookOpen, Building2, ChartNoAxesCombined, Download, FileSpreadsheet, FileText, Flame, HandCoins, KeyRound, LayoutDashboard, LogOut, Menu, ReceiptText, ShieldCheck, ShoppingBag, Upload, UserPlus, Users, X } from "lucide-react";
+import { BellRing, BookOpen, Building2, ChartNoAxesCombined, Download, FileSpreadsheet, FileText, Flame, HandCoins, KeyRound, LayoutDashboard, LogOut, Menu, ReceiptText, ShieldCheck, ShoppingBag, Upload, UserPlus, Users, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import type { AdminSession } from "@/lib/auth";
 import ChatDock from "@/components/chat/ChatDock";
+import VerificationNotifications from "@/components/verification/VerificationNotifications";
 
 const links = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
@@ -14,6 +15,7 @@ const links = [
   { href: "/admin/customers/new", label: "Add customer", icon: UserPlus },
   { href: "/admin/customers", label: "Customers & KYC", icon: Users },
   { href: "/admin/verification", label: "Verification & TEs", icon: ShieldCheck },
+  { href: "/admin/verification-results", label: "Verification results", icon: BellRing },
   { href: "/admin/bills/new", label: "Create bill", icon: ReceiptText },
   { href: "/admin/bills", label: "Bill register", icon: FileText },
   { href: "/admin/bill-import", label: "Import bills", icon: Upload },
@@ -30,7 +32,7 @@ export default function AdminShell({ session, children, accessMode = "admin" }: 
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
-  const visibleLinks = accessMode === "floor" ? links.filter(link => link.href === "/admin/operations") : links;
+  const visibleLinks = accessMode === "floor" ? links.filter(link => ["/admin/operations", "/admin/verification-results"].includes(link.href)) : links;
   const logout = async () => {
     await fetch(accessMode === "floor" ? "/api/head-office/logout" : "/api/admin/logout", { method: "POST" });
     router.replace(accessMode === "floor" ? "/head-office/login" : "/admin/login");
@@ -43,7 +45,7 @@ export default function AdminShell({ session, children, accessMode = "admin" }: 
       <div className="admin-user logo-only"><div className="user-avatar logo-avatar"><Image src={session.companyLogo} alt={session.companyName} width={38} height={38}/></div><button onClick={logout} title="Sign out" aria-label="Sign out"><LogOut/></button></div>
     </aside>
     {open && <button className="sidebar-scrim" onClick={() => setOpen(false)} aria-label="Close navigation"/>}
-    <div className="admin-main"><header className="admin-topbar"><button className="sidebar-toggle" onClick={() => setOpen(true)} aria-label="Open navigation"><Menu/></button><div><span className="company-dot"/> Secure workspace</div><span>{session.companyShortName}</span></header><main className="admin-content">{children}</main></div>
+    <div className="admin-main"><header className="admin-topbar"><button className="sidebar-toggle" onClick={() => setOpen(true)} aria-label="Open navigation"><Menu/></button><div><span className="company-dot"/> Secure workspace</div><div className="admin-topbar-actions"><VerificationNotifications historyHref="/admin/verification-results"/><span>{session.companyShortName}</span></div></header><main className="admin-content">{children}</main></div>
     <ChatDock scope={accessMode === "floor" ? "floor" : "admin"}/>
   </div>;
 }

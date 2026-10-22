@@ -2,17 +2,19 @@
 
 Open `http://127.0.0.1:8000/` for the Aryan Gold employee web application and `http://127.0.0.1:8000/admin/login` for administrator sign-in.
 
-Use an existing authorized account from the imported backup or the local accounts supplied in chat. The local database is separate from existing XAMPP databases. The current Android release is version 5.0.41 (5042), while the hosted web release remains 5.0.40 (5041). Both are branded for Aryan Gold. The full upstream user guide is retained in `UPSTREAM_USER_GUIDE.md`.
+Use an existing authorized account from the imported backup or the local accounts supplied in chat. The local database is separate from existing XAMPP databases. The current Android and web release is version 5.0.42 (5043). Both are branded for Aryan Gold. The full upstream user guide is retained in `UPSTREAM_USER_GUIDE.md`.
 
 The production app connects to `https://attendance.aryangold.in/api` by default. Local employee web and Android builds connect to the local API only when the developer builds them with the documented `API_BASE_URL` override. Release Android builds reject cleartext HTTP; debug builds retain HTTP support for local development.
 
 The Aryan Gold staff login page at `https://aryangold.in/login` provides direct Android APK downloads for both the AJ app and the Attendance app. The Attendance APK opens the hosted service at `https://attendance.aryangold.in`.
 
+Every Attendance surface now uses the same official square Aryan Gold mark published on `aryangoldbuyers.com`. This includes the employee app, loading and sign-in screens, administrator and recruitment pages, browser favicons and install icons, notifications, employee ID cards, and Android, iOS, macOS, Windows, and web app icons.
+
 The employee web sign-in screen fills the available browser height while keeping visible breathing room above and below the login panel. The administrator dashboard now displays the Aryan Gold sidebar logo and uses the Aryan Gold icon whenever an administrator has no uploaded profile photo.
 
 Attendance forms now use consistent high-contrast fields, focus borders, and full-height action buttons. On the My Attendance page, the employee name, branch name, employee ID, and branch ID are shown on separate aligned lines so long names remain readable. Desktop web dashboards can be scrolled normally and display a standard scrollbar when content extends below the window.
 
-Version 5.0.41 (5042) is available from the Attendance download link on the Aryan Gold staff login page as Android package `aryan.attendance`. It enables Firebase notifications while retaining the cohesive motion and full-viewport Aryan Gold splash from 5.0.40. The direct-download APK uses the same signing certificate as version 5.0.37, so it can update that directly distributed build in place.
+Version 5.0.42 (5043) is available from the Attendance download link on the Aryan Gold staff login page as Android package `aryan.attendance`. It retains Firebase notifications and the full-viewport launch experience while standardizing every brand surface on the official Aryan Gold mark. The direct-download APK uses the same signing certificate as version 5.0.37, so it can update that directly distributed build in place.
 
 ## Firebase attendance notifications
 
@@ -25,6 +27,8 @@ The launch screen introduces the employee workspace with a short staged Aryan Go
 The application uses a light cream background (`#FDF4E6`), deep teal (`#006A64`) for primary actions, gold (`#F5C21B`) for restrained highlights, and dark red (`#A11E1E`) for warnings and destructive actions.
 
 Keep the local database and web server running while using the app. If the website cannot be reached, restart the server using the developer guide. Local email is written to Laravel logs.
+
+Production securely retrieves its server credentials from Vault. After a hosting restart, the service may remain temporarily unavailable until an authorized operator unseals Vault; users should retry after the operator confirms recovery. No employee, administrator, branch, billing, or Verification password workflow changes because of this backend security change.
 
 Hiring and joining forms now ask for a preferred work location from a dropdown of currently active Aryan Gold branches. The hiring selection is carried into the joining form when that branch remains active. If an older saved choice is no longer available, select a current branch before submitting.
 
@@ -50,7 +54,7 @@ Attendance administrators can use the eye button beside each field on **Admin > 
 
 Employees can open **My Profile > My Documents** in the Attendance app to download professionally formatted PDF employment documents. The system makes each document available only when its source records are ready:
 
-- **Offer Letter** appears after a positive salary is saved. It shows monthly and annual salary plus the payroll deductions that may apply.
+- **Offer Letter** appears after a positive salary is saved. It shows monthly and annual salary, a three-month probationary period, applicable payroll deductions, generic terms of employment and the employee code of conduct.
 - **Experience Letter** appears after the Date of Joining is saved. If a Last Working Date exists, the letter uses it as the end of service; otherwise it states that employment continues to the present date.
 - **Payslip** appears for a completed month only when the employee has a positive salary and attendance or administrator regularization activity for that month. It includes attendance totals, gross payable salary, PF, advances, security deposit and net pay using the same payroll rules as the Salary screen. The current incomplete month is never published as a payslip.
 - **Relieving Letter** appears after the Last Working Date is saved.
@@ -67,6 +71,10 @@ Branch-portal sign-in now explains the exact corrective action: an employee with
 
 ## Documentation change log
 
+- 2026-10-22: Expanded the generated offer letter into a professionally structured two-page document with a three-month probationary period, employment terms and code-of-conduct expectations.
+- 2026-10-22: Removed the insecure built-in VM password; the VM Attendance shortcut is available only when operations has configured its protected Vault secret.
+- 2026-10-22: Documented the production Vault dependency and post-restart availability behavior; employee and administrator workflows are unchanged.
+- 2026-10-20: Standardized all Attendance, administrator, recruitment, ID-card, favicon, notification, splash, launcher, PWA, and desktop icon assets on the official Aryan Gold mark used by `aryangoldbuyers.com`, and released Android and web version 5.0.42 (5043).
 - 2026-10-19: Registered the Attendance Android package with Firebase, enabled authenticated employee push notifications by default, prevented duplicate background alerts, and released Android version 5.0.41 (5042).
 - 2026-10-19: Replaced free-form hiring and joining location choices with a required dropdown of currently active Aryan Gold branches and carried the hiring preference into joining.
 - 2026-10-16: Added a shared motion system for page navigation, authentication and dashboard state changes, dialogs, bottom sheets, staggered shortcut entrances, press feedback, submission controls, and loading-to-result changes; preserved reduced-motion behavior and released Android and web version 5.0.40 (5041).

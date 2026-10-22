@@ -16,6 +16,7 @@ import {
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useRealtimeData } from "@/components/realtime/RealtimeSync";
 import { messageFrom, requestJson } from "@/lib/client-api";
+import VerificationDetailsModal from "@/components/verification/VerificationDetailsModal";
 
 type Row = Record<string, string | number | boolean | null>;
 type Data = { tes: Row[]; requests: Row[] };
@@ -26,6 +27,7 @@ export default function VerificationAdmin() {
     [saving, setSaving] = useState(false),
     [showPassword, setShowPassword] = useState(false),
     [notice, setNotice] = useState("");
+  const [verificationId, setVerificationId] = useState<number | null>(null);
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
@@ -371,6 +373,7 @@ export default function VerificationAdmin() {
                         <small>{row.verificationNotes}</small>
                       )}
                       {row.failureReason && <small>{row.failureReason}</small>}
+                      <button className="table-action" type="button" onClick={() => setVerificationId(Number(row.id))}>Verification details</button>
                     </td>
                   </tr>
                 ))
@@ -383,6 +386,7 @@ export default function VerificationAdmin() {
           </table>
         </div>
       </section>
+      {verificationId && <VerificationDetailsModal requestId={verificationId} onClose={() => setVerificationId(null)} onViewed={() => void load(true)} />}
     </div>
   );
 }

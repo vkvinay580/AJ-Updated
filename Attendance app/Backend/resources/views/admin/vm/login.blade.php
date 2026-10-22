@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>VM Login</title>
+    <link rel="icon" href="{{ \App\Support\ProjectAsset::url('admin/assets/images/aryan_gold_favicon.png') }}?v=3" type="image/png">
     <link href="{{ \App\Support\ProjectAsset::url('public/admin/assets/css/bootstrap.min.css') }}" rel="stylesheet">
     <style>
         body {

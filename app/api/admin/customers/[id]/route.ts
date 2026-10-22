@@ -24,6 +24,8 @@ export async function GET(
     place_of_supply AS placeOfSupply, postal_code AS postalCode,
     customer_image_path IS NOT NULL AS hasImage, employer_name AS employerName, employer_address AS employerAddress,
     employment_designation AS employmentDesignation, company_id_card_path IS NOT NULL AS hasCompanyIdCard,
+    recommendation_name AS recommendationName,recommendation_relationship AS recommendationRelationship,
+    recommendation_phone AS recommendationPhone,recommendation_address AS recommendationAddress,
     old_gold_wearing_image_path IS NOT NULL AS hasOldGoldWearingImage, created_at AS createdAt
     FROM customers WHERE id = ? AND company_id = ?`,
     [id, session.companyId],
@@ -114,6 +116,10 @@ export async function PATCH(
     form.get("employmentDesignation"),
     120,
   );
+  const recommendationName = cleanText(form.get("recommendationName"), 190);
+  const recommendationRelationship = cleanText(form.get("recommendationRelationship"), 120);
+  const recommendationPhone = cleanPhone(form.get("recommendationPhone"));
+  const recommendationAddress = cleanText(form.get("recommendationAddress"), 500);
   if (phone.length !== 10)
     return apiError("Enter a valid 10-digit phone number.");
   if (name.length < 2) return apiError("Customer name is required.");
@@ -123,6 +129,8 @@ export async function PATCH(
     return apiError("Enter a valid 15-character GSTIN.");
   if (stateCode && !/^\d{2}$/.test(stateCode))
     return apiError("State code must contain 2 digits.");
+  if (recommendationName.length < 2 || !recommendationRelationship || recommendationPhone.length !== 10 || !recommendationAddress)
+    return apiError("Complete the recommendation or relative name, relationship, phone number, and address.");
   const customer = await one<
     RowDataPacket & {
       id: number;
@@ -163,6 +171,7 @@ export async function PATCH(
       await execute(
         `UPDATE customers SET phone = ?, name = ?, email = ?, address = ?, city = ?, state = ?, gstin = ?, state_code = ?, place_of_supply = ?, postal_code = ?,
         employer_name = ?, employer_address = ?, employment_designation = ?,
+        recommendation_name = ?, recommendation_relationship = ?, recommendation_phone = ?, recommendation_address = ?,
         company_id_card_path = COALESCE(?, company_id_card_path), company_id_card_original_name = COALESCE(?, company_id_card_original_name),
         company_id_card_mime_type = COALESCE(?, company_id_card_mime_type),
         old_gold_wearing_image_path = COALESCE(?, old_gold_wearing_image_path), old_gold_wearing_image_original_name = COALESCE(?, old_gold_wearing_image_original_name),
@@ -181,6 +190,10 @@ export async function PATCH(
           employerName || null,
           employerAddress || null,
           employmentDesignation || null,
+          recommendationName,
+          recommendationRelationship,
+          recommendationPhone,
+          recommendationAddress,
           storedCompanyId?.path || null,
           storedCompanyId && companyIdCard instanceof File
             ? cleanText(companyIdCard.name, 255)

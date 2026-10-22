@@ -3,7 +3,7 @@ export const COMPANIES = [
     slug: "aryan-gold",
     name: "Aryan Gold",
     shortName: "AG",
-    logo: "/brands/aryan-gold.png",
+    logo: "/brands/aryan-gold.webp",
     accent: "#c89424",
   },
   {
