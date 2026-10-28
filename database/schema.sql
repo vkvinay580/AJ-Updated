@@ -234,6 +234,54 @@ CREATE TABLE IF NOT EXISTS branch_notifications (
   CONSTRAINT fk_branch_notification_verification FOREIGN KEY (verification_request_id) REFERENCES customer_verification_requests(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS contact_branch_visits (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  event_key CHAR(64) NOT NULL,
+  event_name VARCHAR(100) NOT NULL,
+  status VARCHAR(100) NOT NULL,
+  contact_external_id VARCHAR(100) NOT NULL,
+  contact_name VARCHAR(190) NOT NULL,
+  contact_mobile VARCHAR(20) NOT NULL,
+  contact_city VARCHAR(120) NULL,
+  branch_id VARCHAR(100) NOT NULL,
+  branch_name VARCHAR(190) NOT NULL,
+  branch_area VARCHAR(190) NULL,
+  branch_city VARCHAR(120) NULL,
+  branch_address VARCHAR(500) NULL,
+  visit_date DATE NOT NULL,
+  visit_time TIME NOT NULL,
+  visit_timezone VARCHAR(100) NOT NULL,
+  visit_at_utc DATETIME NOT NULL,
+  received_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_contact_branch_visit_event (event_key),
+  KEY idx_contact_branch_visit_branch (branch_id, visit_at_utc)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS branch_visit_notifications (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  visit_id BIGINT UNSIGNED NOT NULL,
+  branch_id VARCHAR(100) NOT NULL,
+  notification_kind ENUM('arrival','30_minutes','15_minutes') NOT NULL,
+  title VARCHAR(190) NOT NULL,
+  body VARCHAR(1000) NOT NULL,
+  deliver_at DATETIME NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_branch_visit_notification (visit_id, notification_kind),
+  KEY idx_branch_visit_notification_due (branch_id, deliver_at),
+  CONSTRAINT fk_branch_visit_notification_visit FOREIGN KEY (visit_id) REFERENCES contact_branch_visits(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS branch_visit_notification_reads (
+  notification_id BIGINT UNSIGNED NOT NULL,
+  employee_id VARCHAR(100) NOT NULL,
+  read_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (notification_id, employee_id),
+  KEY idx_branch_visit_notification_reader (employee_id, read_at),
+  CONSTRAINT fk_branch_visit_notification_read FOREIGN KEY (notification_id) REFERENCES branch_visit_notifications(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS bills (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   company_id INT UNSIGNED NOT NULL,
@@ -294,6 +342,53 @@ CREATE TABLE IF NOT EXISTS bill_items (
   amount_paise BIGINT NOT NULL,
   PRIMARY KEY (id), KEY idx_bill_items_bill (bill_id),
   CONSTRAINT fk_item_bill FOREIGN KEY (bill_id) REFERENCES bills(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS quotation_sequences (
+  company_id INT UNSIGNED NOT NULL,
+  quotation_year SMALLINT UNSIGNED NOT NULL,
+  last_number INT UNSIGNED NOT NULL DEFAULT 0,
+  PRIMARY KEY (company_id, quotation_year),
+  CONSTRAINT fk_quotation_sequence_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS quotations (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  company_id INT UNSIGNED NOT NULL,
+  customer_id BIGINT UNSIGNED NOT NULL,
+  quotation_number VARCHAR(50) NOT NULL,
+  business_mode ENUM('walkin','pledged') NOT NULL DEFAULT 'walkin',
+  total_weight_mg BIGINT UNSIGNED NOT NULL,
+  total_paise BIGINT UNSIGNED NOT NULL,
+  pledge_amount_paise BIGINT UNSIGNED NULL,
+  notes VARCHAR(1000) NULL,
+  origin_branch_id VARCHAR(100) NULL,
+  created_by_employee_id VARCHAR(100) NULL,
+  created_by INT UNSIGNED NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_quotation_company_number (company_id, quotation_number),
+  KEY idx_quotation_company_created (company_id, created_at),
+  KEY idx_quotation_customer (customer_id, created_at),
+  CONSTRAINT fk_quotation_company FOREIGN KEY (company_id) REFERENCES companies(id),
+  CONSTRAINT fk_quotation_customer FOREIGN KEY (customer_id) REFERENCES customers(id),
+  CONSTRAINT fk_quotation_admin FOREIGN KEY (created_by) REFERENCES admins(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS quotation_items (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  quotation_id BIGINT UNSIGNED NOT NULL,
+  description VARCHAR(190) NOT NULL,
+  purity VARCHAR(30) NOT NULL,
+  gross_weight_mg BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  stone_weight_mg BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  wastage_weight_mg BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  weight_mg BIGINT UNSIGNED NOT NULL,
+  rate_paise_per_gram BIGINT UNSIGNED NOT NULL,
+  amount_paise BIGINT UNSIGNED NOT NULL,
+  PRIMARY KEY (id),
+  KEY idx_quotation_items_quotation (quotation_id),
+  CONSTRAINT fk_quotation_item_quotation FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS accounts_users (

@@ -1,6 +1,6 @@
 "use client";
 
-import { BellRing, BookOpen, Building2, ChartNoAxesCombined, Download, FileSpreadsheet, FileText, Flame, HandCoins, KeyRound, LayoutDashboard, LogOut, Menu, ReceiptText, ShieldCheck, ShoppingBag, Upload, UserPlus, Users, X } from "lucide-react";
+import { BellRing, BookOpen, Building2, ChartNoAxesCombined, Download, FileSignature, FileSpreadsheet, FileText, Flame, HandCoins, KeyRound, LayoutDashboard, LogOut, Menu, ReceiptText, ShieldCheck, ShoppingBag, Upload, UserPlus, Users, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -17,6 +17,7 @@ const links = [
   { href: "/admin/verification", label: "Verification & TEs", icon: ShieldCheck },
   { href: "/admin/verification-results", label: "Verification results", icon: BellRing },
   { href: "/admin/bills/new", label: "Create bill", icon: ReceiptText },
+  { href: "/admin/quotations", label: "Quotations", icon: FileSignature },
   { href: "/admin/bills", label: "Bill register", icon: FileText },
   { href: "/admin/bill-import", label: "Import bills", icon: Upload },
   { href: "/admin/stock-ledger", label: "Stock ledger", icon: BookOpen },

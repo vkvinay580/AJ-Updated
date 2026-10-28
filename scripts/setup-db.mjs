@@ -113,6 +113,28 @@ try {
   }
   await connection.query("UPDATE bill_items SET hsn_code='711319' WHERE hsn_code='710319'");
 
+  const [existingQuotationColumns] = await connection.query("SHOW COLUMNS FROM quotations");
+  const quotationColumnNames = new Set(existingQuotationColumns.map((column) => column.Field));
+  if (!quotationColumnNames.has("business_mode")) {
+    await connection.query("ALTER TABLE quotations ADD COLUMN business_mode ENUM('walkin','pledged') NOT NULL DEFAULT 'walkin' AFTER quotation_number");
+  }
+  if (!quotationColumnNames.has("pledge_amount_paise")) {
+    await connection.query("ALTER TABLE quotations ADD COLUMN pledge_amount_paise BIGINT UNSIGNED NULL AFTER total_paise");
+  }
+
+  const [existingQuotationItemColumns] = await connection.query("SHOW COLUMNS FROM quotation_items");
+  const quotationItemColumnNames = new Set(existingQuotationItemColumns.map((column) => column.Field));
+  if (!quotationItemColumnNames.has("gross_weight_mg")) {
+    await connection.query("ALTER TABLE quotation_items ADD COLUMN gross_weight_mg BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER purity");
+    await connection.query("UPDATE quotation_items SET gross_weight_mg=weight_mg WHERE gross_weight_mg=0");
+  }
+  if (!quotationItemColumnNames.has("stone_weight_mg")) {
+    await connection.query("ALTER TABLE quotation_items ADD COLUMN stone_weight_mg BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER gross_weight_mg");
+  }
+  if (!quotationItemColumnNames.has("wastage_weight_mg")) {
+    await connection.query("ALTER TABLE quotation_items ADD COLUMN wastage_weight_mg BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER stone_weight_mg");
+  }
+
   const customerWorkingProofColumns = [
     ["employer_name", "VARCHAR(190) NULL AFTER customer_image_path"],
     ["employer_address", "VARCHAR(500) NULL AFTER employer_name"],

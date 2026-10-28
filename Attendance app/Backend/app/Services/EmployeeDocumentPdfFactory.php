@@ -103,40 +103,21 @@ final class EmployeeDocumentPdfFactory
     {
         $joiningDate = $this->date($employee->doj);
         $endDate = $this->date($employee->last_working_date);
-        $serviceEnd = $endDate?->format('d F Y') ?? 'the present date';
+        $serviceEnd = $endDate?->format('d F Y') ?? '--';
         $designation = $this->value($employee->designation, 'Employee');
-        $pdf = (new ProfessionalPdf('Experience Letter'))
-            ->heading('Experience Letter', 'To whom it may concern')
+        $pdf = (new ProfessionalPdf('Experience Letter / Relieving Letter'))
+            ->heading('Experience Letter / Relieving Letter', 'To whom it may concern')
             ->metadata([
                 ['label' => 'EMPLOYEE', 'value' => $this->value($employee->name)],
                 ['label' => 'EMPLOYEE ID', 'value' => $this->value($employee->empId)],
                 ['label' => 'DESIGNATION', 'value' => $designation],
                 ['label' => 'SERVICE PERIOD', 'value' => ($joiningDate?->format('d M Y') ?? '--').' to '.$serviceEnd],
             ])
-            ->paragraph('This is to certify that '.$this->value($employee->name, 'the employee').' has been associated with Aryan Gold from '.($joiningDate?->format('d F Y') ?? '--').' to '.$serviceEnd.' in the capacity of '.$designation.'.')
+            ->paragraph('This is to certify that '.$this->value($employee->name, 'the employee').' was associated with Aryan Gold from '.($joiningDate?->format('d F Y') ?? '--').' to '.$serviceEnd.' in the capacity of '.$designation.'.')
             ->paragraph('During this period, the employee carried out assigned responsibilities and contributed to the organisation with professionalism. We appreciate the service rendered and wish the employee continued success in future endeavours.')
-            ->paragraph('This letter is issued upon request for official employment-verification purposes.')
-            ->signature();
-
-        return $pdf->output();
-    }
-
-    public function relievingLetter(Employee $employee): string
-    {
-        $lastWorkingDate = $this->date($employee->last_working_date);
-        $designation = $this->value($employee->designation, 'Employee');
-        $pdf = (new ProfessionalPdf('Relieving Letter'))
-            ->heading('Relieving Letter', 'Issued on '.Carbon::now($this->timezone())->format('d F Y'))
-            ->metadata([
-                ['label' => 'EMPLOYEE', 'value' => $this->value($employee->name)],
-                ['label' => 'EMPLOYEE ID', 'value' => $this->value($employee->empId)],
-                ['label' => 'DESIGNATION', 'value' => $designation],
-                ['label' => 'LAST WORKING DATE', 'value' => $lastWorkingDate?->format('d F Y') ?? '--'],
-            ])
-            ->salutation($this->value($employee->name, 'Employee'))
-            ->paragraph('This is to confirm that you have been relieved from your duties as '.$designation.' with Aryan Gold effective at the close of business on '.($lastWorkingDate?->format('d F Y') ?? '--').'.')
-            ->paragraph('We acknowledge your contribution during your tenure. Any remaining financial settlement, statutory processing or asset clearance continues to be governed by company records and applicable policy.')
-            ->paragraph('We thank you for your service and wish you success in your future professional pursuits.')
+            ->paragraph('This is also to confirm that the employee was relieved from the duties of '.$designation.' with Aryan Gold effective at the close of business on '.$serviceEnd.'.')
+            ->paragraph('We acknowledge the employee\'s contribution during the period of service. Any remaining financial settlement, statutory processing or asset clearance continues to be governed by company records and applicable policy.')
+            ->paragraph('This combined experience and relieving letter is issued upon request for official employment-verification purposes.')
             ->signature();
 
         return $pdf->output();

@@ -16,8 +16,6 @@ final class GeneratedEmployeeDocumentService
 
     public const PAYSLIP = 'payslip';
 
-    public const RELIEVING_LETTER = 'relieving-letter';
-
     public function __construct(
         private readonly EmployeeSalarySummaryService $salarySummaryService,
         private readonly EmployeeDocumentPdfFactory $pdfFactory
@@ -32,8 +30,13 @@ final class GeneratedEmployeeDocumentService
             $documents[] = $this->descriptor($employee, self::OFFER_LETTER, 'Offer Letter', 'offer-letter-'.$this->fileEmployeeId($employee).'.pdf');
         }
 
-        if ($this->date($employee->doj)) {
-            $documents[] = $this->descriptor($employee, self::EXPERIENCE_LETTER, 'Experience Letter', 'experience-letter-'.$this->fileEmployeeId($employee).'.pdf');
+        if ($this->canGenerateExperienceLetter($employee)) {
+            $documents[] = $this->descriptor(
+                $employee,
+                self::EXPERIENCE_LETTER,
+                'Experience Letter / Relieving Letter',
+                'experience-relieving-letter-'.$this->fileEmployeeId($employee).'.pdf'
+            );
         }
 
         if ($salary > 0) {
@@ -46,10 +49,6 @@ final class GeneratedEmployeeDocumentService
                     $month->format('Y-m')
                 );
             }
-        }
-
-        if ($this->date($employee->last_working_date)) {
-            $documents[] = $this->descriptor($employee, self::RELIEVING_LETTER, 'Relieving Letter', 'relieving-letter-'.$this->fileEmployeeId($employee).'.pdf');
         }
 
         return $documents;
@@ -66,7 +65,6 @@ final class GeneratedEmployeeDocumentService
         $pdf = match ($type) {
             self::OFFER_LETTER => $this->pdfFactory->offerLetter($employee, $this->salarySummaryService->salaryFor($employee)),
             self::EXPERIENCE_LETTER => $this->pdfFactory->experienceLetter($employee),
-            self::RELIEVING_LETTER => $this->pdfFactory->relievingLetter($employee),
             self::PAYSLIP => $this->pdfFactory->payslip(
                 $employee,
                 $this->salarySummaryService->forMonth(
@@ -78,6 +76,12 @@ final class GeneratedEmployeeDocumentService
         };
 
         return ['content' => $pdf, 'fileName' => $available['fileName']];
+    }
+
+    public function canGenerateExperienceLetter(Employee $employee): bool
+    {
+        return $this->date($employee->doj) !== null
+            && $this->date($employee->last_working_date) !== null;
     }
 
     private function eligiblePayslipMonths(Employee $employee): array

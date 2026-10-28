@@ -49,11 +49,54 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
   if (error || !session) return error;
   const id = Number((await context.params).id);
   if (!Number.isInteger(id) || id < 1) return apiError("Invalid bill.");
-  const bill = await one<RowDataPacket & { billNumber: string }>("SELECT bill_number AS billNumber FROM bills WHERE id = ? AND company_id = ?", [id, session.companyId]);
-  if (!bill) return apiError("Bill not found.", 404);
-  await transaction(async (connection) => {
-    await execute("DELETE FROM bills WHERE id = ? AND company_id = ?", [id, session.companyId], connection);
-    await execute("INSERT INTO audit_logs (admin_id, company_id, action, entity_type, entity_id, ip_address) VALUES (?, ?, 'bill_deleted', 'bill', ?, ?)", [session.adminId, session.companyId, id, requestIp(request)], connection);
-  });
-  return NextResponse.json({ ok: true, billNumber: bill.billNumber });
+  try {
+    const billNumber = await transaction(async (connection) => {
+      const bill = await one<RowDataPacket & { billNumber: string }>("SELECT bill_number AS billNumber FROM bills WHERE id = ? AND company_id = ? FOR UPDATE", [id, session.companyId], connection);
+      if (!bill) throw new Error("BILL_NOT_FOUND");
+      const linkedTransaction = await one<RowDataPacket & { id: number; branchId: string }>(
+        "SELECT id,branch_id AS branchId FROM branch_transactions WHERE bill_id = ? LIMIT 1 FOR UPDATE",
+        [id],
+        connection,
+      );
+      if (linkedTransaction) {
+        const dispatchedItem = await one<RowDataPacket>(
+          "SELECT id FROM branch_gold_transfer_items WHERE transaction_id = ? LIMIT 1 FOR UPDATE",
+          [Number(linkedTransaction.id)],
+          connection,
+        );
+        if (dispatchedItem) throw new Error("BRANCH_BILL_DISPATCHED");
+
+        // Serialize balance changes with the approval and branch-payment paths. Keep
+        // the original ledger history and post an equal reversal for the admin delete.
+        await rows<RowDataPacket>("SELECT id FROM branch_fund_ledger WHERE branch_id = ? FOR UPDATE", [String(linkedTransaction.branchId)], connection);
+        await rows<RowDataPacket>("SELECT id FROM branch_stock_ledger WHERE branch_id = ? FOR UPDATE", [String(linkedTransaction.branchId)], connection);
+        const fundEffect = await one<RowDataPacket>(`SELECT COALESCE(SUM(CASE WHEN direction='credit' THEN amount_paise ELSE -amount_paise END),0) AS balanceEffect
+          FROM branch_fund_ledger WHERE reference_id = ? AND entry_type IN
+          ('pledge_reserved','pledge_cancelled','pledge_release_adjustment','purchase_submitted','purchase_billed','purchase_rejected','pledge_admin_rejected')`,
+          [Number(linkedTransaction.id)], connection);
+        const stockEffect = await one<RowDataPacket>(`SELECT COALESCE(SUM(CASE WHEN direction='in' THEN weight_mg ELSE -weight_mg END),0) AS balanceEffect
+          FROM branch_stock_ledger WHERE reference_id = ? AND entry_type IN ('purchase_billed','sale_billed')`,
+          [Number(linkedTransaction.id)], connection);
+        const fundBalanceEffect = Number(fundEffect?.balanceEffect || 0);
+        if (fundBalanceEffect !== 0) await execute(`INSERT INTO branch_fund_ledger
+          (branch_id,direction,amount_paise,entry_type,reference_id,description,created_by_admin_id) VALUES (?,?,?,?,?,?,?)`,
+          [String(linkedTransaction.branchId), fundBalanceEffect > 0 ? "debit" : "credit", Math.abs(fundBalanceEffect), "bill_deleted_reversal",
+            Number(linkedTransaction.id), `Admin deletion reversal for bill ${bill.billNumber}`, session.adminId], connection);
+        const stockBalanceEffect = Number(stockEffect?.balanceEffect || 0);
+        if (stockBalanceEffect !== 0) await execute(`INSERT INTO branch_stock_ledger
+          (branch_id,direction,weight_mg,entry_type,reference_id,description,created_by_admin_id) VALUES (?,?,?,?,?,?,?)`,
+          [String(linkedTransaction.branchId), stockBalanceEffect > 0 ? "out" : "in", Math.abs(stockBalanceEffect), "bill_deleted_reversal",
+            Number(linkedTransaction.id), `Admin deletion reversal for bill ${bill.billNumber}`, session.adminId], connection);
+        await execute("DELETE FROM branch_transactions WHERE id = ? AND bill_id = ?", [Number(linkedTransaction.id), id], connection);
+      }
+      await execute("DELETE FROM bills WHERE id = ? AND company_id = ?", [id, session.companyId], connection);
+      await execute("INSERT INTO audit_logs (admin_id, company_id, action, entity_type, entity_id, ip_address) VALUES (?, ?, 'bill_deleted', 'bill', ?, ?)", [session.adminId, session.companyId, id, requestIp(request)], connection);
+      return String(bill.billNumber);
+    });
+    return NextResponse.json({ ok: true, billNumber });
+  } catch (caught) {
+    if (caught instanceof Error && caught.message === "BILL_NOT_FOUND") return apiError("Bill not found.", 404);
+    if (caught instanceof Error && caught.message === "BRANCH_BILL_DISPATCHED") return apiError("This purchase invoice cannot be deleted because its gold was already dispatched to Head Office.", 409);
+    throw caught;
+  }
 }

@@ -4,9 +4,10 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import type { RowDataPacket } from "mysql2";
 import { apiError } from "@/lib/api";
-import { businessAuthenticated } from "@/lib/business-actor";
+import { businessAuthenticated, type BusinessActor } from "@/lib/business-actor";
 import { one, rows } from "@/lib/db";
 import { getCompanyInvoiceProfile, getCompanySeal } from "@/lib/company-invoice";
+import { authenticatedForOperations } from "@/lib/operations-auth";
 
 const inr=(paise:number)=>`INR ${(Number(paise)/100).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 const ones=["","One","Two","Three","Four","Five","Six","Seven","Eight","Nine","Ten","Eleven","Twelve","Thirteen","Fourteen","Fifteen","Sixteen","Seventeen","Eighteen","Nineteen"],tens=["","","Twenty","Thirty","Forty","Fifty","Sixty","Seventy","Eighty","Ninety"];
@@ -16,7 +17,17 @@ function amountWords(paise:number){const rupees=Math.floor(Number(paise)/100),fr
 const rate=(bps:number)=>`${(Number(bps)/100).toFixed(2).replace(/\.00$/,"")}%`;
 
 export async function GET(request:NextRequest,context:{params:Promise<{id:string}>}){
-  const {error,actor:session}=await businessAuthenticated(request); if(error||!session)return error;
+  const {error,actor}=await businessAuthenticated(request);
+  let session:BusinessActor|null=actor;
+  if(!session&&request.nextUrl.pathname.startsWith("/api/admin/")){
+    const operations=await authenticatedForOperations(request);
+    if(operations.access){
+      const admin=operations.access.session;
+      session={companyId:admin.companyId,companySlug:admin.companySlug,companyName:admin.companyName,
+        companyShortName:admin.companyShortName,companyLogo:admin.companyLogo,adminId:admin.adminId,branchId:null,employeeId:null};
+    }
+  }
+  if(!session)return error??apiError("Your session has expired.",401);
   const id=Number((await context.params).id); if(!Number.isInteger(id))return apiError("Invalid bill.");
   const bill=await one<RowDataPacket>(`SELECT b.bill_number billNumber,b.transaction_type transactionType,DATE_FORMAT(b.bill_date,'%d-%b-%Y') billDate,b.subtotal_paise subtotalPaise,b.tax_paise taxPaise,b.cgst_paise cgstPaise,b.sgst_paise sgstPaise,b.cgst_rate_bps cgstRateBps,b.sgst_rate_bps sgstRateBps,b.adjustment_paise adjustmentPaise,b.total_paise totalPaise,b.release_place releasePlace,b.release_amount_paise releaseAmountPaise,b.payment_method paymentMethod,b.notes,b.ornament_image_path ornamentPath,b.signature_image_path signaturePath,c.name customerName,c.phone customerPhone,c.address customerAddress,c.city customerCity,c.state customerState,c.state_code customerStateCode,c.place_of_supply placeOfSupply,c.postal_code customerPostalCode,c.gstin customerGstin,c.customer_image_path customerImagePath,(SELECT number_last4 FROM kyc_records WHERE customer_id=c.id AND company_id=c.company_id AND document_type='aadhaar' LIMIT 1) aadhaarLast4,(SELECT number_last4 FROM kyc_records WHERE customer_id=c.id AND company_id=c.company_id AND document_type='pan' LIMIT 1) panLast4 FROM bills b JOIN customers c ON c.id=b.customer_id AND c.company_id=b.company_id WHERE b.id=? AND b.company_id=? AND (? IS NULL OR b.origin_branch_id=?)`,[id,session.companyId,session.branchId,session.branchId]);
   if(!bill)return apiError("Bill not found.",404);

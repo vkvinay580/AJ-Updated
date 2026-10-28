@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Models\Employee;
 use App\Services\EmployeeDocumentPdfFactory;
+use App\Services\GeneratedEmployeeDocumentService;
 use Tests\TestCase;
 
 class EmployeeDocumentPdfTest extends TestCase
@@ -29,7 +30,6 @@ class EmployeeDocumentPdfTest extends TestCase
         $documents = [
             $factory->offerLetter($this->employee, 45000),
             $factory->experienceLetter($this->employee),
-            $factory->relievingLetter($this->employee),
             $factory->payslip($this->employee, [
                 'monthLabel' => 'September 2026',
                 'salary' => 45000,
@@ -90,5 +90,25 @@ class EmployeeDocumentPdfTest extends TestCase
         $this->assertStringContainsString('CODE OF CONDUCT', $pdf);
         $this->assertStringContainsString('Confidentiality and work product', $pdf);
         $this->assertStringContainsString('Discipline and separation', $pdf);
+    }
+
+    public function test_combined_experience_and_relieving_letter_uses_the_last_working_date(): void
+    {
+        $pdf = app(EmployeeDocumentPdfFactory::class)->experienceLetter($this->employee);
+
+        $this->assertStringContainsString('Experience Letter / Relieving Letter', $pdf);
+        $this->assertStringContainsString('30 September 2026', $pdf);
+        $this->assertStringContainsString('was relieved from the duties', $pdf);
+    }
+
+    public function test_experience_and_relieving_letter_requires_a_last_working_date(): void
+    {
+        $documents = app(GeneratedEmployeeDocumentService::class);
+
+        $this->assertTrue($documents->canGenerateExperienceLetter($this->employee));
+
+        $this->employee->last_working_date = null;
+
+        $this->assertFalse($documents->canGenerateExperienceLetter($this->employee));
     }
 }

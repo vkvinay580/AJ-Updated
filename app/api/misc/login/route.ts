@@ -1,0 +1,38 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createMiscSession } from "@/lib/misc-auth";
+import { apiError, cleanText, requestIp, sameOrigin } from "@/lib/api";
+import { authenticateMiscUser } from "@/lib/misc-store";
+
+const attempts = new Map<string, { count: number; resetAt: number }>();
+
+export async function POST(request: NextRequest) {
+  if (!sameOrigin(request)) return apiError("Invalid request origin.", 403);
+  const ip = requestIp(request);
+  const now = Date.now();
+  const current = attempts.get(ip);
+  if (current && current.resetAt > now && current.count >= 8) {
+    return apiError("Too many login attempts. Please wait 15 minutes.", 429);
+  }
+
+  const body = await request.json().catch(() => ({}));
+  const username = cleanText(body.username, 80).toLowerCase();
+  const password = String(body.password || "");
+  if (!username || !password) return apiError("Username and password are required.");
+
+  try {
+    const user = await authenticateMiscUser(username, password);
+    if (!user) {
+      attempts.set(ip, {
+        count: current && current.resetAt > now ? current.count + 1 : 1,
+        resetAt: now + 15 * 60 * 1000,
+      });
+      return apiError("Invalid Misc credentials.", 401);
+    }
+    attempts.delete(ip);
+    await createMiscSession(user);
+    return NextResponse.json({ ok: true, role: user.role });
+  } catch (error) {
+    console.error("Unable to sign in to Misc:", error);
+    return apiError("The secure Misc store is unavailable.", 500);
+  }
+}

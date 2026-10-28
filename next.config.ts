@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
-  serverExternalPackages: ["@ffprobe-installer/ffprobe"],
+  serverExternalPackages: ["@ffprobe-installer/ffprobe", "pdfkit"],
   allowedDevOrigins: ["127.0.0.1", "192.168.1.71"],
   experimental: {
     useTypeScriptCli: false,
@@ -21,6 +21,14 @@ const nextConfig: NextConfig = {
       ] },
       { source: "/api/admin/:path*", headers: [
         { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive, noimageindex" },
+      ] },
+      { source: "/misc/:path*", headers: [
+        { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive, noimageindex" },
+        { key: "Cache-Control", value: "no-store" },
+      ] },
+      { source: "/api/misc/:path*", headers: [
+        { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive, noimageindex" },
+        { key: "Cache-Control", value: "no-store" },
       ] },
     ];
   },

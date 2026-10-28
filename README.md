@@ -12,6 +12,7 @@ A responsive gold-trading website and private, multi-company administration syst
 - Upload or live webcam capture for KYC documents and an optional customer photograph.
 - Branch billing can assign a customer home-verification visit to an admin-created TE. The Aryan Verification Android app records photos, an optional compressed visit video, references, an authentication person and mobile number, and a verified/could-not-verify outcome. Results appear under customer KYC and notify the requesting BM.
 - Gold sale and purchase bills with multiple items, purity, weight, rate, tax, adjustment, and payment method.
+- Walk-in and pledged gold quotations with per-item gross, stone, and wastage weights, a quotation-only rate, and the pledge amount where applicable.
 - Company-isolated customer, KYC, and bill search.
 - Print-ready invoices with browser PDF download support.
 - Private cross-role chat for Admin, Branch, Head Office/Floor, and Accounts users, with unread notifications, read receipts, camera capture, voice notes, and protected document attachments.
@@ -48,6 +49,25 @@ BRANCH_PORTAL_URL=https://biz.aryangold.in
 
 The business Vault path owns database credentials, the data-encryption key, bootstrap role credentials, the Attendance integration key, and Verification Firebase server credentials. Attendance uses a separate AppRole and `secret/data/apps/attendance`. See [VAULT_OPERATIONS.md](./VAULT_OPERATIONS.md) for policy, bootstrap, rotation, outage, and recovery procedures. AppRole bootstrap files are revocable credentials—not application secrets—and must remain owner-only.
 
+## Customer branch-visit webhook
+
+Set a long random `CONTACT_VISIT_WEBHOOK_SECRET` in the business Vault, apply the database schema with `npm run db:setup`, and send visits to `POST /api/integrations/contact-visits`. Authenticate with `Authorization: Bearer <secret>` (preferred) or `X-Webhook-Secret: <secret>`.
+
+```bash
+curl -X POST https://aryangold.in/api/integrations/contact-visits \
+  -H 'Authorization: Bearer YOUR_SECRET' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "event":"contact.visiting_branch",
+    "status":"visiting_branch",
+    "contact":{"id":42,"name":"Asha Rao","mobile":"9876543210","city":"Bengaluru"},
+    "branch":{"id":"BLR-01","name":"Malleshwaram","area":"Malleshwaram","city":"Bengaluru","address":"1 Main Road"},
+    "visit":{"date":"2026-10-27","time":"14:35","timezone":"Asia/Kolkata"}
+  }'
+```
+
+The event is idempotent for the same contact, branch, and arrival time. Matching branch sessions receive an immediate popup and bell item, followed by due alerts 30 and 15 minutes before arrival. Times are stored in UTC and rendered from the supplied local date, time, and IANA timezone.
+
 `NEXT_PUBLIC_SITE_URL` drives canonical metadata, the sitemap, robots file, and primary-site origin validation. `BRANCH_PORTAL_URL` is also included in the same-origin allowlist so browser POST requests from the mapped branch subdomain pass CSRF protection behind cPanel's reverse proxy. Both values must be HTTPS origins without paths or credentials. Create DNS and TLS for the attendance and branch subdomains before publishing the Android apps. The Attendance production runtime settings are documented in `Attendance app/Backend/.env.production.example`; production secret values belong only in Vault.
 
 Back up the database, `storage/kyc`, `storage/pledges`, `storage/chat`, and `storage/verification` together. Customer KYC files, company ID cards, and old-gold wearing images are stored under `storage/kyc`; private documents, verification photos, and chat attachments are never placed in the public directory.
@@ -69,7 +89,9 @@ The MySQL/MariaDB schema is stored in [database/schema.sql](./database/schema.sq
 - `kyc_records` (encrypted number, search hash, masked last four, private file path)
 - `te_users`, `te_sessions`, `te_device_tokens` (TE credentials, expiring app sessions, notification registrations)
 - `customer_verification_requests`, `customer_verification_photos`, `customer_verification_videos`, `customer_verification_references`, `branch_notifications` (visit assignment, evidence, result, and requesting BM alerts)
+- `contact_branch_visits`, `branch_visit_notifications`, `branch_visit_notification_reads` (incoming customer appointments, scheduled branch alerts, and per-manager read state)
 - `bills`, `bill_items`, and `invoice_sequences` (concurrency-safe company-specific bill numbers)
+- `quotations`, `quotation_items`, and `quotation_sequences` (walk-in or pledged company-specific estimates with auditable deductions and quotation-only rates)
 - `audit_logs`
 
 ## Verification

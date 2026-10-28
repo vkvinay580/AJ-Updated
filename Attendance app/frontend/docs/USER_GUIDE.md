@@ -2,7 +2,7 @@
 
 Open `http://127.0.0.1:8000/` for the Aryan Gold employee web application and `http://127.0.0.1:8000/admin/login` for administrator sign-in.
 
-Use an existing authorized account from the imported backup or the local accounts supplied in chat. The local database is separate from existing XAMPP databases. The current Android and web release is version 5.0.42 (5043). Both are branded for Aryan Gold. The full upstream user guide is retained in `UPSTREAM_USER_GUIDE.md`.
+Use an existing authorized account from the imported backup or the local accounts supplied in chat. The local database is separate from existing XAMPP databases. The current Android and web release is version 5.0.43 (5044). Both are branded for Aryan Gold. The full upstream user guide is retained in `UPSTREAM_USER_GUIDE.md`.
 
 The production app connects to `https://attendance.aryangold.in/api` by default. Local employee web and Android builds connect to the local API only when the developer builds them with the documented `API_BASE_URL` override. Release Android builds reject cleartext HTTP; debug builds retain HTTP support for local development.
 
@@ -14,11 +14,11 @@ The employee web sign-in screen fills the available browser height while keeping
 
 Attendance forms now use consistent high-contrast fields, focus borders, and full-height action buttons. On the My Attendance page, the employee name, branch name, employee ID, and branch ID are shown on separate aligned lines so long names remain readable. Desktop web dashboards can be scrolled normally and display a standard scrollbar when content extends below the window.
 
-Version 5.0.42 (5043) is available from the Attendance download link on the Aryan Gold staff login page as Android package `aryan.attendance`. It retains Firebase notifications and the full-viewport launch experience while standardizing every brand surface on the official Aryan Gold mark. The direct-download APK uses the same signing certificate as version 5.0.37, so it can update that directly distributed build in place.
+Version 5.0.43 (5044) is available from the Attendance download link on the Aryan Gold staff login page as Android package `aryan.attendance`. It retains Firebase notifications and the full-viewport launch experience while using the Aryan teal-green treatment for notification backgrounds and accents. The direct-download APK uses the same signing certificate as version 5.0.37, so it can update that directly distributed build in place.
 
 ## Firebase attendance notifications
 
-The Android app asks for notification permission and registers the signed-in employee's device with the Attendance server. Administrators can send notices from **Admin > Notifications**, and workflow events such as leave decisions, attendance regularization, branch-opening assignments, work visits, and bank-detail requests can also alert the affected employee. Notifications appear while the app is open, in the background, or after it is reopened; the in-app notification list remains the fallback when delivery is delayed or notification permission is denied.
+The Android app asks for notification permission and registers the signed-in employee's device with the Attendance server. Administrators can send notices from **Admin > Notifications**, and workflow events such as leave decisions, attendance regularization, branch-opening assignments, work visits, and bank-detail requests can also alert the affected employee. Notifications appear while the app is open, in the background, or after it is reopened; the in-app notification list remains the fallback when delivery is delayed or notification permission is denied. Unread notification cards and Android notification accents use green instead of red.
 
 Allow notifications when Android prompts. If alerts do not appear, open Android **Settings > Apps > Aryan Gold Attendance > Notifications**, enable **Admin notifications**, confirm that Google Play services and internet access are available, then sign out and sign in again to refresh the device registration. The app never displays two alerts for the same background Firebase message.
 
@@ -55,9 +55,8 @@ Attendance administrators can use the eye button beside each field on **Admin > 
 Employees can open **My Profile > My Documents** in the Attendance app to download professionally formatted PDF employment documents. The system makes each document available only when its source records are ready:
 
 - **Offer Letter** appears after a positive salary is saved. It shows monthly and annual salary, a three-month probationary period, applicable payroll deductions, generic terms of employment and the employee code of conduct.
-- **Experience Letter** appears after the Date of Joining is saved. If a Last Working Date exists, the letter uses it as the end of service; otherwise it states that employment continues to the present date.
+- **Experience Letter / Relieving Letter** is one combined PDF. It appears only after both the Date of Joining and Last Working Date are saved, and confirms the employee's service period and relief from duties on the recorded Last Working Date.
 - **Payslip** appears for a completed month only when the employee has a positive salary and attendance or administrator regularization activity for that month. It includes attendance totals, gross payable salary, PF, advances, security deposit and net pay using the same payroll rules as the Salary screen. The current incomplete month is never published as a payslip.
-- **Relieving Letter** appears after the Last Working Date is saved.
 
 Generated PDFs carry the footer **Digitally generated through Aryan Attendance Application.** Files manually uploaded by HR continue to appear in the same list. Downloads open through the device browser and use a short-lived secure link. Pull down or use **Refresh** after HR updates salary, joining date, attendance or last-working-date records.
 
@@ -71,6 +70,9 @@ Branch-portal sign-in now explains the exact corrective action: an employee with
 
 ## Documentation change log
 
+- 2026-10-24: Combined the generated experience and relieving documents into one **Experience Letter / Relieving Letter**, available only after a Last Working Date is saved.
+- 2026-10-24: Changed Attendance notification backgrounds, shadows, unread indicators, and Android/Firebase notification accents from red to green; released Android and web version 5.0.43 (5044).
+- 2026-10-24: Updated generated experience letters for active employees to print the actual PDF download date instead of the phrase "the present date."
 - 2026-10-22: Expanded the generated offer letter into a professionally structured two-page document with a three-month probationary period, employment terms and code-of-conduct expectations.
 - 2026-10-22: Removed the insecure built-in VM password; the VM Attendance shortcut is available only when operations has configured its protected Vault secret.
 - 2026-10-22: Documented the production Vault dependency and post-restart availability behavior; employee and administrator workflows are unchanged.

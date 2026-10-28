@@ -169,6 +169,7 @@ class FirebaseCloudMessagingService
                 'notification' => [
                     'channel_id' => 'admin_push_notifications',
                     'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
+                    'color' => '#006A64',
                     'sound' => 'default',
                 ],
             ];
@@ -182,6 +183,7 @@ class FirebaseCloudMessagingService
                 'notification' => [
                     'channel_id' => 'admin_push_notifications',
                     'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
+                    'color' => '#006A64',
                 ],
             ];
             $message['apns'] = [

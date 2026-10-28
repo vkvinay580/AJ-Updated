@@ -29,7 +29,7 @@ class EmployeeDocument extends Model
         return [
             'offer_letter' => 'Offer letter',
             'payslip' => 'Payslip',
-            'experience_letter' => 'Experience letter',
+            'experience_letter' => 'Experience letter / Relieving letter',
             'relieving_letter' => 'Relieving letter',
         ];
     }

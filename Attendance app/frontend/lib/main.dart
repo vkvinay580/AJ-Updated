@@ -268,6 +268,8 @@ class AttendanceNotificationService {
           icon: _notificationIcon,
           importance: Importance.max,
           priority: Priority.max,
+          color: AppColors.primary,
+          colorized: true,
           autoCancel: true,
         ),
       );
@@ -17549,7 +17551,7 @@ class _NotificationCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isUnread ? AppColors.primarySoft : Colors.white,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: isUnread ? AppColors.primary : const Color(0xFFE8E1EF),
@@ -17557,7 +17559,9 @@ class _NotificationCard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: isUnread ? const Color(0x24C62828) : const Color(0x10000000),
+            color: isUnread
+                ? AppColors.primary.withValues(alpha: 0.14)
+                : const Color(0x10000000),
             blurRadius: isUnread ? 22 : 12,
             offset: const Offset(0, 8),
           ),
@@ -17572,13 +17576,13 @@ class _NotificationCard extends StatelessWidget {
             height: 46,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: isUnread ? AppColors.primarySoft : AppColors.surfaceTint,
+              color: isUnread ? AppColors.surface : AppColors.surfaceTint,
             ),
             child: Icon(
               isUnread
                   ? Icons.notifications_active_rounded
                   : Icons.notifications_none_rounded,
-              color: isUnread ? AppColors.primary : AppColors.secondary,
+              color: isUnread ? AppColors.primary : AppColors.primaryDark,
             ),
           ),
           const SizedBox(width: 14),
@@ -17604,7 +17608,7 @@ class _NotificationCard extends StatelessWidget {
                         width: 8,
                         height: 8,
                         decoration: const BoxDecoration(
-                          color: Color(0xFFE5446D),
+                          color: AppColors.success,
                           shape: BoxShape.circle,
                         ),
                       ),

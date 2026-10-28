@@ -6,6 +6,7 @@ import { fundBalance } from "@/lib/branch-ledger";
 import { one } from "@/lib/db";
 import type { RowDataPacket } from "mysql2";
 import type { GoldRateSettings } from "@/lib/gold-rates";
+import VerificationNotifications from "@/components/verification/VerificationNotifications";
 
 export default async function BranchNewBillPage() {
   const session = await requireBranchSession();
@@ -22,5 +23,5 @@ export default async function BranchNewBillPage() {
     purchaseRate916:Number(settings?.purchaseRate916||0), saleRate916:Number(settings?.saleRate916||0),
     purchaseRate750:Number(settings?.purchaseRate750||0), saleRate750:Number(settings?.saleRate750||0),
   };
-  return <div className="branch-form-page"><Suspense fallback={<div className="loading-state page-loading">Preparing billing…</div>}><BillForm portal="branch" fixedRates={fixedRates} availableFundPaise={availableFundPaise}/></Suspense><ChatDock scope="branch"/></div>;
+  return <div className="branch-form-page"><div className="branch-form-notifications"><VerificationNotifications historyHref="/branch/verifications" includeBranchVisits/></div><Suspense fallback={<div className="loading-state page-loading">Preparing billing…</div>}><BillForm portal="branch" fixedRates={fixedRates} availableFundPaise={availableFundPaise}/></Suspense><ChatDock scope="branch"/></div>;
 }

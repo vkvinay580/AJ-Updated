@@ -6,6 +6,7 @@ import { useRealtimeData } from "@/components/realtime/RealtimeSync";
 import { messageFrom, requestJson } from "@/lib/client-api";
 import { GOLD_PURITY_OPTIONS, goldRateFor, type GoldRateSettings } from "@/lib/gold-rates";
 import VerificationDetailsModal from "@/components/verification/VerificationDetailsModal";
+import BillDocumentActions from "@/components/billing/BillDocumentActions";
 
 type Row = Record<string,string|number|boolean|null>;
 type Directory = { employees:Row[]; branches:Row[] };
@@ -40,9 +41,9 @@ export default function AdminOperations() {
           <td>{row.customerName}<small>{row.customerPhone}</small></td>
           <td>{row.businessMode}<small>{row.pledgeStatus!=="not_applicable"?String(row.pledgeStatus).replaceAll("_"," "):""}</small></td>
           <td>{row.employeeId}</td><td>{row.type}</td><td>{grams(row.weightMg)}</td>
-          <td className="strong">{row.billId?<>{money(Number(row.cashPaymentPaise||0)+Number(row.onlinePaymentPaise||0))}<small>Cash: {money(row.cashPaymentPaise)} · Online: {money(row.onlinePaymentPaise)}</small>{row.businessMode==="pledged"&&<small>Release: {money(row.releaseAmountPaise)} · {row.releasePlace}</small>}</>:money(row.pledgeAmountPaise||row.amountPaise)}</td>
-          <td>{row.billId&&<a className="table-action" href={`/admin/bills/${row.billId}`} target="_blank">Invoice</a>} {row.hasPledgeDocument&&<a className="table-action" href={`/api/business/documents/${row.id}`} target="_blank">Pledge bill</a>} {row.verificationRequestId&&<button className="table-action" onClick={()=>setVerificationId(Number(row.verificationRequestId))}>Verification details</button>} {!row.billId&&!row.hasPledgeDocument&&!row.verificationRequestId&&"—"}</td>
-          <td><Status value={row.status}/>{row.verificationRequestId&&<small>Verification: {String(row.verificationStatus).replaceAll("_"," ")}</small>}</td>
+          <td className="strong">{Boolean(row.billId)?<>{money(Number(row.cashPaymentPaise||0)+Number(row.onlinePaymentPaise||0))}<small>Cash: {money(row.cashPaymentPaise)} · Online: {money(row.onlinePaymentPaise)}</small>{row.businessMode==="pledged"&&<small>Release: {money(row.releaseAmountPaise)} · {row.releasePlace}</small>}</>:money(row.pledgeAmountPaise||row.amountPaise)}</td>
+          <td>{Boolean(row.billId)&&<a className="table-action" href={`/admin/bills/${row.billId}`} target="_blank">Invoice</a>} {Boolean(row.hasPledgeDocument)&&<a className="table-action" href={`/api/business/documents/${row.id}`} target="_blank">Pledge bill</a>} {Boolean(row.verificationRequestId)&&<button className="table-action" onClick={()=>setVerificationId(Number(row.verificationRequestId))}>Verification details</button>} {!row.billId&&!row.hasPledgeDocument&&!row.verificationRequestId&&"—"}</td>
+          <td>{row.status==="billed"&&Boolean(row.billId)?<BillDocumentActions billId={Number(row.billId)} portal="admin"/>:<Status value={row.status}/>} {Boolean(row.verificationRequestId)&&<small>Verification: {String(row.verificationStatus).replaceAll("_"," ")}</small>}</td>
           <td>{["submitted","transit"].includes(String(row.status))?<TransactionActions row={row} accessMode={data.accessMode} onApprove={()=>review("transaction",Number(row.id),"billed")} onReject={()=>review("transaction",Number(row.id),"rejected")}/>:row.status==="awaiting_pledge"?"Awaiting branch billing":"Reviewed"}</td>
         </>}
       />}
