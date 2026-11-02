@@ -54,7 +54,7 @@ Attendance administrators can use the eye button beside each field on **Admin > 
 
 Employees can open **My Profile > My Documents** in the Attendance app to download professionally formatted PDF employment documents. The system makes each document available only when its source records are ready:
 
-- **Offer Letter** appears after a positive salary is saved. It shows monthly and annual salary, a three-month probationary period, applicable payroll deductions, generic terms of employment and the employee code of conduct.
+- **Offer Letter** appears after a positive salary is saved. It shows monthly and annual salary and a three-month probationary period. Permanent employment is subject to satisfactory performance and conduct during probation plus written company confirmation. PF and ESI eligibility under company policy begins after confirmation, while any legally mandatory statutory coverage applies when required. Unsatisfactory performance may result in discontinuation during probation, and misconduct or serious employment-related issues may result in immediate termination subject to applicable law. The letter also includes payroll deductions, general employment terms and the employee code of conduct.
 - **Experience Letter / Relieving Letter** is one combined PDF. It appears only after both the Date of Joining and Last Working Date are saved, and confirms the employee's service period and relief from duties on the recorded Last Working Date.
 - **Payslip** appears for a completed month only when the employee has a positive salary and attendance or administrator regularization activity for that month. It includes attendance totals, gross payable salary, PF, advances, security deposit and net pay using the same payroll rules as the Salary screen. The current incomplete month is never published as a payslip.
 
@@ -76,6 +76,7 @@ Branch-portal sign-in now explains the exact corrective action: an employee with
 
 ## Documentation change log
 
+- 2026-11-02: Clarified in generated offer letters that permanent employment and company-policy PF/ESI eligibility are subject to satisfactory probation and written confirmation, and that probationary employment may be discontinued for unsatisfactory performance or terminated immediately for misconduct or serious issues, subject to applicable law.
 - 2026-10-28: Added protected deletion for unused connected branches and a clear conflict response when employees are still assigned.
 - 2026-10-28: Fixed new branch creation with long Google Maps and Street View URLs by expanding the stored branch URL, address, and timings fields to match the connected API limits.
 - 2026-10-28: Changed the AJ branch sign-in, active branch sessions, homepage locations, and connected server applications to use the current Attendance branch code and name on every load or request.
