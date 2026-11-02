@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { RowDataPacket } from "mysql2";
+import type { PoolConnection } from "mysql2/promise";
 import { apiError, cleanPhone, cleanText, sameOrigin } from "@/lib/api";
 import { getBranchSession } from "@/lib/branch-auth";
 import { addFundEntry, addStockEntry, fundBalance, lockStockLedger, stockBalance } from "@/lib/branch-ledger";
@@ -9,6 +10,37 @@ const paise = (value: unknown) => Math.round(Number(value) * 100);
 const milligrams = (value: unknown) => Math.round(Number(value) * 1000);
 const positive = (value: number) => Number.isFinite(value) && value > 0;
 const nonNegative = (value: number) => Number.isFinite(value) && value >= 0;
+type WaitingCustomerRow = RowDataPacket & { id:number; companyId:number; name:string; phone:string; joinedAt:Date|string };
+
+function indiaDate() {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone:"Asia/Kolkata", year:"numeric", month:"2-digit", day:"2-digit" }).formatToParts(new Date());
+  const part = (type:string) => parts.find(item => item.type === type)?.value || "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+async function waitingCustomers(branchId:string, date:string, connection?:PoolConnection) {
+  return rows<WaitingCustomerRow>(`SELECT c.id,c.company_id AS companyId,c.name,c.phone,c.created_at AS joinedAt
+    FROM customers c JOIN companies company ON company.id=c.company_id AND company.slug='aryan-gold'
+    WHERE c.origin_branch_id=? AND DATE(DATE_ADD(c.created_at,INTERVAL 330 MINUTE))=?
+      AND NOT EXISTS(SELECT 1 FROM bills bill WHERE bill.customer_id=c.id AND bill.company_id=c.company_id AND bill.origin_branch_id=c.origin_branch_id)
+      AND NOT EXISTS(SELECT 1 FROM customer_workflow_outcomes outcome
+        WHERE outcome.customer_id=c.id AND outcome.company_id=c.company_id AND outcome.outcome_date=? AND outcome.status='not_billed')
+    ORDER BY c.created_at,c.id`, [branchId,date,date], connection);
+}
+
+function waitingCustomerResponse(customers:WaitingCustomerRow[]) {
+  return NextResponse.json({
+    code:"WAITING_CUSTOMERS",
+    error:`${customers.length} customer${customers.length===1?" is":"s are"} still waiting without a bill.`,
+    waitingCustomers:customers.map(customer=>({ id:Number(customer.id),name:String(customer.name),phone:String(customer.phone),joinedAt:customer.joinedAt })),
+  }, { status:409 });
+}
+
+async function markWaitingCustomers(connection:PoolConnection, customers:WaitingCustomerRow[], branchId:string, date:string, source:"send_report"|"branch_closing", employeeId:string) {
+  for (const customer of customers) await execute(`INSERT IGNORE INTO customer_workflow_outcomes
+    (company_id,customer_id,branch_id,outcome_date,status,source,marked_by_employee_id) VALUES (?,?,?,?,'not_billed',?,?)`,
+    [Number(customer.companyId),Number(customer.id),branchId,date,source,employeeId], connection);
+}
 
 async function authorized(request: NextRequest) {
   if (!sameOrigin(request)) return { session: null, error: apiError("Invalid request origin.", 403) };
@@ -124,8 +156,13 @@ export async function POST(request: NextRequest) {
     if (!packetIds.length) return apiError("Select at least one billed packet.");
     if (!nonNegative(tareWeightMg)) return apiError("Enter a valid tare weight.");
     if ((bmName && bmPhone.length !== 10) || (!bmName && bmPhone)) return apiError("Enter both the BM name and a valid 10-digit BM phone number.");
+    const reportDate = indiaDate();
+    const confirmWaitingCustomers = value(body, "markWaitingNotBilled") === true || value(body, "markWaitingNotBilled") === "1";
+    const currentWaitingCustomers = await waitingCustomers(branchId, reportDate);
+    if (currentWaitingCustomers.length && !confirmWaitingCustomers) return waitingCustomerResponse(currentWaitingCustomers);
     try {
       await transaction(async (connection) => {
+        if (confirmWaitingCustomers) await markWaitingCustomers(connection, await waitingCustomers(branchId, reportDate, connection), branchId, reportDate, "send_report", employeeId);
         const placeholders = packetIds.map(() => "?").join(",");
         const selected = await rows<RowDataPacket>(`SELECT bi.id AS billItemId,bi.weight_mg AS weightMg,b.id AS billId,t.id AS transactionId
           FROM branch_transactions t JOIN bills b ON b.id=t.bill_id JOIN bill_items bi ON bi.bill_id=b.id
@@ -182,12 +219,18 @@ export async function POST(request: NextRequest) {
     const values = { openingCash: paise(value(body, "openingCash")), transactions: Number(value(body, "transactions")), expenses: paise(value(body, "expenses")),
       goldPurchased: milligrams(value(body, "goldPurchased")), amountPaid: paise(value(body, "amountPaid")), goldSent: milligrams(value(body, "goldSent")), stock: milligrams(value(body, "stock")) };
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isInteger(values.transactions) || values.transactions < 0 || !Object.entries(values).filter(([key]) => key !== "transactions").every(([, item]) => nonNegative(item))) return apiError("Enter a valid date and non-negative closing figures.");
-    await execute(`INSERT INTO branch_daily_closings
-      (branch_id,closing_date,opening_cash_paise,transaction_count,expenses_paise,gold_purchased_mg,amount_paid_paise,gold_sent_to_ho_mg,gold_in_branch_stock_mg,notes,created_by_employee_id)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE opening_cash_paise=VALUES(opening_cash_paise),transaction_count=VALUES(transaction_count),
-      expenses_paise=VALUES(expenses_paise),gold_purchased_mg=VALUES(gold_purchased_mg),amount_paid_paise=VALUES(amount_paid_paise),
-      gold_sent_to_ho_mg=VALUES(gold_sent_to_ho_mg),gold_in_branch_stock_mg=VALUES(gold_in_branch_stock_mg),notes=VALUES(notes),created_by_employee_id=VALUES(created_by_employee_id)`,
-      [branchId, date, values.openingCash, values.transactions, values.expenses, values.goldPurchased, values.amountPaid, values.goldSent, values.stock, cleanText(value(body, "notes"), 1000) || null, employeeId]);
+    const confirmWaitingCustomers = value(body, "markWaitingNotBilled") === true || value(body, "markWaitingNotBilled") === "1";
+    const currentWaitingCustomers = await waitingCustomers(branchId, date);
+    if (currentWaitingCustomers.length && !confirmWaitingCustomers) return waitingCustomerResponse(currentWaitingCustomers);
+    await transaction(async connection => {
+      if (confirmWaitingCustomers) await markWaitingCustomers(connection, await waitingCustomers(branchId, date, connection), branchId, date, "branch_closing", employeeId);
+      await execute(`INSERT INTO branch_daily_closings
+        (branch_id,closing_date,opening_cash_paise,transaction_count,expenses_paise,gold_purchased_mg,amount_paid_paise,gold_sent_to_ho_mg,gold_in_branch_stock_mg,notes,created_by_employee_id)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE opening_cash_paise=VALUES(opening_cash_paise),transaction_count=VALUES(transaction_count),
+        expenses_paise=VALUES(expenses_paise),gold_purchased_mg=VALUES(gold_purchased_mg),amount_paid_paise=VALUES(amount_paid_paise),
+        gold_sent_to_ho_mg=VALUES(gold_sent_to_ho_mg),gold_in_branch_stock_mg=VALUES(gold_in_branch_stock_mg),notes=VALUES(notes),created_by_employee_id=VALUES(created_by_employee_id)`,
+        [branchId, date, values.openingCash, values.transactions, values.expenses, values.goldPurchased, values.amountPaid, values.goldSent, values.stock, cleanText(value(body, "notes"), 1000) || null, employeeId], connection);
+    });
     return NextResponse.json({ ok: true, message: "Daily closing submitted." });
   }
 

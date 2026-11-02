@@ -8,12 +8,163 @@ use App\Models\EmployeeAppCredential;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 class BusinessIntegrationController extends Controller
 {
+    public function branches(Request $request): JsonResponse
+    {
+        $this->authorizeIntegration($request);
+
+        return response()->json([
+            'branches' => Branch::query()
+                ->orderBy('branchName')
+                ->get(['id', 'branchId', 'branchName', 'addressline', 'area', 'city', 'state', 'pincode', 'timings', 'latitude', 'longitude', 'url', 'status'])
+                ->map(fn (Branch $branch): array => $this->branchDirectoryPayload($branch))
+                ->values(),
+        ])->header('Cache-Control', 'no-store, private');
+    }
+
+    public function branchContext(Request $request): JsonResponse
+    {
+        $this->authorizeIntegration($request);
+        $data = $request->validate([
+            'employeeId' => ['required', 'string', 'max:100'],
+        ]);
+
+        $employeeId = trim((string) $data['employeeId']);
+        $employee = Employee::query()
+            ->whereRaw('TRIM(empId) = ?', [$employeeId])
+            ->first(['id', 'empId', 'status', 'assigned_branch_id']);
+        $assignedBranchId = trim((string) ($employee?->assigned_branch_id ?? ''));
+        $branch = $employee && ! $employee->isInactive() && $assignedBranchId !== ''
+            ? Branch::query()
+                ->whereRaw('TRIM(branchId) = ?', [$assignedBranchId])
+                ->where('status', 1)
+                ->first(['id', 'branchId', 'branchName', 'addressline', 'area', 'city', 'state', 'pincode', 'timings', 'latitude', 'longitude', 'url', 'status'])
+            : null;
+
+        return response()->json([
+            'employeeId' => $employeeId,
+            'branch' => $branch ? $this->branchDirectoryPayload($branch) : null,
+        ])->header('Cache-Control', 'no-store, private');
+    }
+
+    public function upsertBranch(Request $request): JsonResponse
+    {
+        $this->authorizeIntegration($request);
+        $data = $request->validate([
+            'branchId' => ['required', 'string', 'max:100', 'regex:/^[A-Za-z0-9][A-Za-z0-9_-]*$/'],
+            'name' => ['required', 'string', 'max:190'],
+            'address' => ['required', 'string', 'max:500'],
+            'area' => ['required', 'string', 'max:190'],
+            'city' => ['required', 'string', 'max:120'],
+            'state' => ['required', 'string', 'max:120'],
+            'pincode' => ['required', 'regex:/^\d{6}$/'],
+            'timings' => ['required', 'string', 'max:255'],
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'url' => ['required', 'url:http,https', 'max:2048'],
+            'status' => ['required', 'in:active,inactive'],
+        ]);
+
+        $branchId = strtoupper(trim((string) $data['branchId']));
+        [$branch, $created] = DB::transaction(function () use ($data, $branchId): array {
+            $branch = Branch::query()->whereRaw('UPPER(TRIM(branchId)) = ?', [$branchId])->lockForUpdate()->first();
+            $created = ! $branch;
+            $branch ??= new Branch();
+            $branch->fill([
+                'branchId' => $branchId,
+                'branchName' => trim((string) $data['name']),
+                'addressline' => trim((string) $data['address']),
+                'area' => trim((string) $data['area']),
+                'city' => trim((string) $data['city']),
+                'state' => trim((string) $data['state']),
+                'pincode' => trim((string) $data['pincode']),
+                'timings' => trim((string) $data['timings']),
+                'latitude' => (float) $data['latitude'],
+                'longitude' => (float) $data['longitude'],
+                'url' => trim((string) $data['url']),
+                'status' => $data['status'] === 'active' ? 1 : 0,
+            ]);
+            $branch->save();
+
+            return [$branch->fresh(), $created];
+        });
+
+        Cache::forget('attendance:branches:all');
+        Cache::forget('attendance:branches:active');
+
+        return response()->json([
+            'created' => $created,
+            'message' => $created ? 'Branch created successfully.' : 'Branch updated successfully.',
+            'branch' => [
+                'id' => (int) $branch->id,
+                'branchId' => trim((string) $branch->branchId),
+                'name' => trim((string) $branch->branchName),
+                'address' => trim((string) $branch->addressline),
+                'area' => trim((string) $branch->area),
+                'city' => trim((string) $branch->city),
+                'state' => trim((string) $branch->state),
+                'pincode' => trim((string) $branch->pincode),
+                'timings' => trim((string) $branch->timings),
+                'latitude' => (float) $branch->latitude,
+                'longitude' => (float) $branch->longitude,
+                'url' => trim((string) $branch->url),
+                'status' => (int) $branch->status === 1 ? 'active' : 'inactive',
+            ],
+        ], $created ? 201 : 200);
+    }
+
+    public function deleteBranch(Request $request, string $branchId): JsonResponse
+    {
+        $this->authorizeIntegration($request);
+        $branchId = strtoupper(trim($branchId));
+        abort_unless(preg_match('/^[A-Z0-9][A-Z0-9_-]{1,99}$/', $branchId) === 1, 422, 'Invalid branch ID.');
+
+        $deleted = DB::transaction(function () use ($branchId): array {
+            $branch = Branch::query()
+                ->whereRaw('UPPER(TRIM(branchId)) = ?', [$branchId])
+                ->lockForUpdate()
+                ->first();
+            abort_unless($branch, 404, 'Branch not found.');
+
+            $assignedEmployees = Employee::query()
+                ->whereRaw('UPPER(TRIM(assigned_branch_id)) = ?', [$branchId])
+                ->count();
+            abort_if($assignedEmployees > 0, 409, sprintf(
+                'Cannot delete %s while %d employee%s assigned. Reassign them or mark the branch inactive.',
+                $branchId,
+                $assignedEmployees,
+                $assignedEmployees === 1 ? ' is' : 's are',
+            ));
+
+            EmployeeAppCredential::query()
+                ->whereRaw('UPPER(TRIM(branch_id)) = ?', [$branchId])
+                ->delete();
+            $deleted = [
+                'id' => (int) $branch->id,
+                'branchId' => trim((string) $branch->branchId),
+                'name' => trim((string) $branch->branchName),
+            ];
+            $branch->delete();
+
+            return $deleted;
+        });
+
+        Cache::forget('attendance:branches:all');
+        Cache::forget('attendance:branches:active');
+
+        return response()->json([
+            'deleted' => true,
+            'message' => sprintf('%s deleted successfully.', $deleted['branchId']),
+            'branch' => $deleted,
+        ]);
+    }
+
     public function directory(Request $request): JsonResponse
     {
         $this->authorizeIntegration($request);
@@ -233,6 +384,25 @@ class BusinessIntegrationController extends Controller
 
         $provided = (string) $request->header('X-Aryan-Integration-Key', '');
         abort_unless($provided !== '' && hash_equals($configured, $provided), 401, 'Invalid integration credentials.');
+    }
+
+    private function branchDirectoryPayload(Branch $branch): array
+    {
+        return [
+            'id' => (int) $branch->id,
+            'branchId' => trim((string) $branch->branchId),
+            'branchName' => trim((string) $branch->branchName),
+            'address' => trim((string) $branch->addressline),
+            'area' => trim((string) $branch->area),
+            'city' => trim((string) $branch->city),
+            'state' => trim((string) $branch->state),
+            'pincode' => trim((string) $branch->pincode),
+            'timings' => trim((string) $branch->timings),
+            'latitude' => is_numeric($branch->latitude) ? (float) $branch->latitude : null,
+            'longitude' => is_numeric($branch->longitude) ? (float) $branch->longitude : null,
+            'url' => trim((string) $branch->url),
+            'status' => (bool) $branch->status,
+        ];
     }
 
     private function nullableClean(mixed $value): ?string

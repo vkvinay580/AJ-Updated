@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { RowDataPacket } from "mysql2";
+import { getAttendanceBranchContext } from "@/lib/attendance";
 import { execute, one } from "@/lib/db";
 
 export const BRANCH_SESSION_COOKIE = "aryan_branch_session";
@@ -40,7 +41,18 @@ export async function getBranchSession(): Promise<BranchSession | null> {
   const row = await one<BranchSessionRow>(`SELECT id AS sessionId, branch_id AS branchId, branch_name AS branchName,
     employee_id AS employeeId, employee_name AS employeeName FROM branch_sessions
     WHERE token_hash=? AND expires_at > UTC_TIMESTAMP()`, [digest(token)]);
-  return row ? { sessionId: Number(row.sessionId), branchId: row.branchId, branchName: row.branchName, employeeId: row.employeeId, employeeName: row.employeeName } : null;
+  if (!row) return null;
+  const context = await getAttendanceBranchContext(row.employeeId);
+  if (!context.branch) {
+    await execute("DELETE FROM branch_sessions WHERE id=?", [Number(row.sessionId)]);
+    return null;
+  }
+  const branchId = context.branch.branchId.trim();
+  const branchName = context.branch.branchName.trim() || branchId;
+  if (branchId !== row.branchId || branchName !== row.branchName) {
+    await execute("UPDATE branch_sessions SET branch_id=?,branch_name=? WHERE id=?", [branchId, branchName, Number(row.sessionId)]);
+  }
+  return { sessionId: Number(row.sessionId), branchId, branchName, employeeId: row.employeeId, employeeName: row.employeeName };
 }
 
 export async function requireBranchSession() {

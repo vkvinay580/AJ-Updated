@@ -77,6 +77,23 @@ CREATE TABLE IF NOT EXISTS customers (
   CONSTRAINT fk_customer_admin FOREIGN KEY (created_by) REFERENCES admins(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS customer_workflow_outcomes (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  company_id INT UNSIGNED NOT NULL,
+  customer_id BIGINT UNSIGNED NOT NULL,
+  branch_id VARCHAR(100) NOT NULL,
+  outcome_date DATE NOT NULL,
+  status ENUM('not_billed') NOT NULL,
+  source ENUM('send_report','branch_closing') NOT NULL,
+  marked_by_employee_id VARCHAR(100) NOT NULL,
+  marked_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_customer_workflow_outcome (customer_id, outcome_date, status),
+  KEY idx_customer_workflow_branch (company_id, branch_id, outcome_date, status),
+  CONSTRAINT fk_customer_workflow_company FOREIGN KEY (company_id) REFERENCES companies(id),
+  CONSTRAINT fk_customer_workflow_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS kyc_records (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   customer_id BIGINT UNSIGNED NOT NULL,

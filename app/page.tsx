@@ -1,7 +1,8 @@
 import { ArrowRight, BadgeIndianRupee, Building2, CheckCircle2, Gem, MapPin, Navigation, Scale, ShieldCheck, Sparkles } from "lucide-react";
 import Image from "next/image";
 import type { Metadata } from "next";
-import { getAttendanceDirectory } from "@/lib/attendance";
+import { connection } from "next/server";
+import { getAttendanceBranches } from "@/lib/attendance";
 import { aryanGoldBuyersLinks } from "@/lib/public-links";
 import ContactPopup from "@/components/home/ContactPopup";
 
@@ -9,28 +10,21 @@ export const metadata: Metadata = {
   alternates: { canonical: "/" },
 };
 
-const fallbackBranches = [
-  { branchId: "AGBPL001", branchName: "Tambaram", city: "Chennai" },
-  { branchId: "AGBPL002", branchName: "Adyar", city: "Chennai" },
-  { branchId: "AGBPL003", branchName: "Malleshwaram", city: "Bengaluru" },
-  { branchId: "AGBPL004", branchName: "T Nagar", city: "Chennai" },
-];
-
 async function loadBranches() {
   try {
-    const directory = await getAttendanceDirectory();
-    const activeBranches = directory.branches.filter((branch) => {
+    const branches = await getAttendanceBranches();
+    return branches.filter((branch) => {
       const branchId = branch.branchId.trim().toUpperCase();
       const publicIdentity = `${branch.branchId} ${branch.branchName} ${branch.city}`.toLowerCase().replace(/[^a-z0-9]/g, "");
       return branch.status && branchId !== "AGBPL000" && !publicIdentity.includes("headoffice");
     });
-    return activeBranches.length ? activeBranches : fallbackBranches;
   } catch {
-    return fallbackBranches;
+    return [];
   }
 }
 
 export default async function Home() {
+  await connection();
   const branches = await loadBranches();
 
   return <>
@@ -62,10 +56,10 @@ export default async function Home() {
       <div className="branches-grid">{branches.map((branch, index) => {
         const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`Aryan Gold ${branch.branchName} ${branch.city}`)}`;
         return <article className={index === 0 ? "branch-card branch-card-featured" : "branch-card"} key={branch.branchId}>
-          <div className="branch-card-icon"><Building2/></div><div className="branch-card-copy"><span>Aryan Gold branch</span><h3>{branch.branchName}</h3><p><MapPin/> {branch.city}</p></div>
+          <div className="branch-card-icon"><Building2/></div><div className="branch-card-copy"><span>{branch.branchId}</span><h3>{branch.branchName}</h3><p><MapPin/> {branch.city}</p></div>
           <a href={mapUrl} target="_blank" rel="noreferrer" aria-label={`View ${branch.branchName} branch on Google Maps`}>View on map <Navigation/></a>
         </article>;
-      })}</div>
+      })}{!branches.length&&<p>Branch locations are temporarily unavailable. Please try again shortly.</p>}</div>
       <div className="branches-contact"><span>Need help choosing a location?</span><a href={aryanGoldBuyersLinks.branches}>Explore all branches <ArrowRight/></a></div>
     </section>
     <section id="process" className="process-section">

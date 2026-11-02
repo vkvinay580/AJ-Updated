@@ -66,10 +66,19 @@ HR Admin users can open an employee record and choose **Employee Documents**. Ac
 
 Attendance is the employee and branch directory for the separate AJ branch business portal. An AJ administrator can assign an active Attendance employee to one active branch and set or replace that employee's business password. The employee then signs in to the branch portal with branch ID, employee ID, and that password. Changing the assignment prevents the old branch from being used for business-portal login. Attendance sign-in and attendance marking continue to use their existing workflows.
 
+The branch sign-in screen now loads the active branch code and branch name directly from Attendance each time it opens. Choose the branch from the live list instead of typing its code. While a branch user is signed in, the portal rechecks the employee's current active branch assignment on every server request; branch code or name changes appear without another sign-in, while a removed assignment or inactive branch ends access. The Aryan Gold homepage and connected server applications also use the live Attendance branch directory and do not show a hardcoded backup list.
+
+Connected branch administrators can create or update branch records with complete Google Maps links, including long Street View URLs. Attendance stores the full link instead of rejecting a new branch whose map URL exceeds the older short-link limit.
+
+Connected branch administrators can also delete an unused branch by its branch ID. A branch with assigned employees cannot be deleted; reassign those employees first or mark the branch inactive so historical activity and active logins are not orphaned.
+
 Branch-portal sign-in now explains the exact corrective action: an employee without any branch assignment is told to contact an administrator for assignment; an employee attempting a different branch is told they are not assigned to the selected branch; an unset business password is identified separately; and an incorrect employee ID or password returns a credential error instead of a technical application message.
 
 ## Documentation change log
 
+- 2026-10-28: Added protected deletion for unused connected branches and a clear conflict response when employees are still assigned.
+- 2026-10-28: Fixed new branch creation with long Google Maps and Street View URLs by expanding the stored branch URL, address, and timings fields to match the connected API limits.
+- 2026-10-28: Changed the AJ branch sign-in, active branch sessions, homepage locations, and connected server applications to use the current Attendance branch code and name on every load or request.
 - 2026-10-24: Combined the generated experience and relieving documents into one **Experience Letter / Relieving Letter**, available only after a Last Working Date is saved.
 - 2026-10-24: Changed Attendance notification backgrounds, shadows, unread indicators, and Android/Firebase notification accents from red to green; released Android and web version 5.0.43 (5044).
 - 2026-10-24: Updated generated experience letters for active employees to print the actual PDF download date instead of the phrase "the present date."

@@ -11,9 +11,36 @@ type AttendanceEmployee = {
   hasPassword: boolean;
 };
 
+export type AttendanceBranchSummary = { id: number; branchId: string; branchName: string; city: string; status: boolean };
+export type AttendanceBranch = AttendanceBranchSummary & {
+  address: string;
+  area: string;
+  state: string;
+  pincode: string;
+  timings: string;
+  latitude: number | null;
+  longitude: number | null;
+  url: string;
+};
+
 export type AttendanceDirectory = {
   employees: AttendanceEmployee[];
-  branches: Array<{ id: number; branchId: string; branchName: string; city: string; status: boolean }>;
+  branches: AttendanceBranchSummary[];
+};
+
+export type AttendanceBranchInput = {
+  branchId: string;
+  name: string;
+  area: string;
+  city: string;
+  state: string;
+  pincode: string;
+  timings: string;
+  address: string;
+  status: "active" | "inactive";
+  latitude: number;
+  longitude: number;
+  url: string;
 };
 
 function config() {
@@ -45,8 +72,32 @@ export function getAttendanceDirectory() {
   return attendanceRequest<AttendanceDirectory>("/business/directory");
 }
 
+export async function getAttendanceBranches() {
+  const result = await attendanceRequest<{ branches: AttendanceBranch[] }>("/business/branches");
+  return result.branches;
+}
+
+export async function getAttendanceBranchContext(employeeId: string) {
+  const query = new URLSearchParams({ employeeId });
+  return attendanceRequest<{ employeeId: string; branch: AttendanceBranch | null }>(`/business/branch-context?${query}`);
+}
+
 export function assignAttendanceEmployee(input: { employeeId: string; branchId: string; password?: string }) {
   return attendanceRequest<{ message: string }>("/business/assign", { method: "POST", body: JSON.stringify(input) });
+}
+
+export function upsertAttendanceBranch(input: AttendanceBranchInput) {
+  return attendanceRequest<{ created: boolean; message: string; branch: AttendanceBranchInput & { id: number } }>("/business/branches", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteAttendanceBranch(branchId: string) {
+  return attendanceRequest<{ deleted: true; message: string; branch: { id: number; branchId: string; name: string } }>(
+    `/business/branches/${encodeURIComponent(branchId)}`,
+    { method: "DELETE" },
+  );
 }
 
 export function changeAttendancePassword(input: { employeeId: string; branchId: string; currentPassword: string; newPassword: string }) {

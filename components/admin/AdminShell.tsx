@@ -1,6 +1,6 @@
 "use client";
 
-import { BellRing, BookOpen, Building2, ChartNoAxesCombined, Download, FileSignature, FileSpreadsheet, FileText, Flame, HandCoins, KeyRound, LayoutDashboard, LogOut, Menu, ReceiptText, ShieldCheck, ShoppingBag, Upload, UserPlus, Users, X } from "lucide-react";
+import { Activity, BellRing, BookOpen, Building2, ChartNoAxesCombined, Download, FileSignature, FileSpreadsheet, FileText, Flame, HandCoins, KeyRound, LayoutDashboard, LogOut, Menu, ReceiptText, ShieldCheck, ShoppingBag, Upload, UserPlus, Users, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -12,6 +12,7 @@ import VerificationNotifications from "@/components/verification/VerificationNot
 const links = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
   { href: "/admin/operations", label: "Branch operations", icon: Building2 },
+  { href: "/admin/track-performance", label: "Track performance", icon: Activity },
   { href: "/admin/customers/new", label: "Add customer", icon: UserPlus },
   { href: "/admin/customers", label: "Customers & KYC", icon: Users },
   { href: "/admin/verification", label: "Verification & TEs", icon: ShieldCheck },

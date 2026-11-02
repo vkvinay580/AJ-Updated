@@ -31,7 +31,11 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 Route::post('/employee/login', [EmployeeAuthController::class, 'login']);
 Route::prefix('business')->group(function () {
     Route::get('/directory', [BusinessIntegrationController::class, 'directory']);
+    Route::get('/branches', [BusinessIntegrationController::class, 'branches']);
+    Route::get('/branch-context', [BusinessIntegrationController::class, 'branchContext']);
     Route::post('/assign', [BusinessIntegrationController::class, 'assign']);
+    Route::post('/branches', [BusinessIntegrationController::class, 'upsertBranch']);
+    Route::delete('/branches/{branchId}', [BusinessIntegrationController::class, 'deleteBranch']);
     Route::post('/login', [BusinessIntegrationController::class, 'login']);
     Route::post('/change-password', [BusinessIntegrationController::class, 'changePassword']);
 });

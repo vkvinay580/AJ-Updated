@@ -44,6 +44,11 @@ export async function createSession(adminId: number, companyId: number) {
 export async function getSession(): Promise<AdminSession | null> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
+  return getSessionByToken(token);
+}
+
+export async function getSessionByToken(token: string): Promise<AdminSession | null> {
+  if (!token) return null;
   const row = await one<SessionRow>(`
     SELECT s.id AS sessionId, a.id AS adminId, a.name AS adminName, a.email,
       c.id AS companyId, c.slug AS companySlug, c.name AS companyName,
