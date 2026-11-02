@@ -22,7 +22,7 @@
         'attendance.reports' => 'admin-attendance-reports', 'attendance.te_tracker' => 'admin-attendance-te-tracker',
         'salary.advance_import' => 'admin-salary-advance-import-page',
         'salary.advance_requests' => 'admin-salary-advance-requests',
-        'salary.advance' => 'admin-salary-advance', 'salary.bank_requests' => 'admin-bank-detail-requests',
+        'salary.advance' => 'admin-salary-advance', 'salary.bank_requests' => 'admin-identity-detail-requests',
         'salary.account_details' => 'admin-salary-account-details', 'salary.reports' => 'admin-salary-reports',
         'salary.advance_reports' => 'admin-advance-reports',
         'outsource.employee_create' => 'admin-employee-create', 'outsource.employee_index' => 'admin-employee-index',

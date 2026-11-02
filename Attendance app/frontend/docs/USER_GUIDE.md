@@ -46,7 +46,7 @@ Approved bank-detail changes can now be submitted from the app without a server 
 
 Administrators can verify submitted bank-detail changes individually or in bulk even when the employee does not yet have a payroll-detail row or optional Aadhaar, PAN, or UAN values. Verification creates the required payroll record and keeps supplied financial identifiers encrypted.
 
-An employee may save a missing Aadhaar or PAN number and add its card image once from **My Profile**. Images may be taken with the camera or selected from the gallery and are kept in private server storage. After a number or card image is saved, it is locked in both the app and the API. To correct a number or replace an image, select **Request Edit Access**, provide a reason, and wait for an Accounts or HR administrator to approve the request. After approval, use **Edit Aadhaar / PAN** to submit the proposed correction or replacement image. Existing verified values and images remain unchanged until the administrator reviews and verifies the submission under **Detail Edit Requests > Aadhaar / PAN Requests**. Rejected replacement images are deleted, and rejected requests can be submitted again with a new reason.
+An employee may save a missing Aadhaar or PAN number and add its card image once from **My Profile**. Images may be taken with the camera or selected from the gallery and are kept in private server storage. After a number or card image is saved, it is locked in both the app and the API. To correct a number or replace an image, select **Request Edit Access**, provide a reason, and wait for an Accounts or HR administrator to approve the request. After approval, use **Edit Aadhaar / PAN** to submit the proposed correction or replacement image. Existing verified values and images remain unchanged until the administrator reviews and verifies the submission under **Employee > Edit Request Access > Aadhaar / PAN Requests**. Rejected replacement images are deleted, and rejected requests can be submitted again with a new reason.
 
 After verification, bank-detail requests appear in the **Approved / Verified** tab. The page shows separate totals for requests waiting for employee submission and requests that are fully verified. Completed verified rows are retained for review and cannot be selected for rejection.
 
@@ -78,6 +78,7 @@ Branch-portal sign-in now explains the exact corrective action: an employee with
 
 ## Documentation change log
 
+- 2026-11-02: Moved bank and Aadhaar/PAN profile approvals to **Employee > Edit Request Access** in the Laravel administrator sidebar.
 - 2026-11-02: Added private Aadhaar/PAN card-image upload, secure employee viewing, approved replacement plus administrator verification, and forced-update Android/web version 5.0.45 (5046).
 - 2026-11-02: Locked saved Aadhaar and PAN numbers, added approval plus verification for corrections, and released forced-update Android/web version 5.0.44 (5045).
 - 2026-11-02: Clarified in generated offer letters that permanent employment and company-policy PF/ESI eligibility are subject to satisfactory probation and written confirmation, and that probationary employment may be discontinued for unsatisfactory performance or terminated immediately for misconduct or serious issues, subject to applicable law.
