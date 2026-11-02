@@ -82,8 +82,18 @@
                                     <td>{{ $row['emp_id'] }}</td>
                                     <td><div>{{ $row['employee_name'] }}</div><small class="text-muted">{{ $row['designation'] }}</small></td>
                                     <td><span class="attendance-status-pill {{ strtolower($row['status']) }}">{{ ucfirst($row['status']) }}</span></td>
-                                    <td style="min-width: 230px;"><div><strong>Aadhaar:</strong> {{ $row['current_aadhaar_no'] ?: '--' }}</div><div><strong>PAN:</strong> {{ $row['current_pan_no'] ?: '--' }}</div></td>
-                                    <td style="min-width: 230px;"><div><strong>Aadhaar:</strong> {{ $row['requested_aadhaar_no'] ?: '--' }}</div><div><strong>PAN:</strong> {{ $row['requested_pan_no'] ?: '--' }}</div></td>
+                                    <td style="min-width: 230px;">
+                                        <div><strong>Aadhaar:</strong> {{ $row['current_aadhaar_no'] ?: '--' }}</div>
+                                        @if ($row['current_aadhaar_image'])<a class="btn btn-outline-secondary btn-sm my-1" target="_blank" rel="noopener" href="{{ route('admin-identity-detail-documents-current', ['employee' => $row['employee_id'], 'type' => 'aadhaar']) }}">View Aadhaar image</a>@endif
+                                        <div><strong>PAN:</strong> {{ $row['current_pan_no'] ?: '--' }}</div>
+                                        @if ($row['current_pan_image'])<a class="btn btn-outline-secondary btn-sm mt-1" target="_blank" rel="noopener" href="{{ route('admin-identity-detail-documents-current', ['employee' => $row['employee_id'], 'type' => 'pan']) }}">View PAN image</a>@endif
+                                    </td>
+                                    <td style="min-width: 230px;">
+                                        <div><strong>Aadhaar:</strong> {{ $row['requested_aadhaar_no'] ?: '--' }}</div>
+                                        @if ($row['requested_aadhaar_image'])<a class="btn btn-outline-primary btn-sm my-1" target="_blank" rel="noopener" href="{{ route('admin-identity-detail-documents-requested', ['requestRecord' => $row['id'], 'type' => 'aadhaar']) }}">Review Aadhaar image</a>@endif
+                                        <div><strong>PAN:</strong> {{ $row['requested_pan_no'] ?: '--' }}</div>
+                                        @if ($row['requested_pan_image'])<a class="btn btn-outline-primary btn-sm mt-1" target="_blank" rel="noopener" href="{{ route('admin-identity-detail-documents-requested', ['requestRecord' => $row['id'], 'type' => 'pan']) }}">Review PAN image</a>@endif
+                                    </td>
                                     <td style="min-width: 240px;"><div><strong>Employee:</strong> {{ $row['request_note'] ?: '--' }}</div><div class="mt-2"><strong>Admin:</strong> {{ $row['admin_note'] ?: '--' }}</div></td>
                                     <td style="min-width: 220px;"><div><strong>Approved:</strong> {{ $row['approved_at'] }}</div><div><strong>Submitted:</strong> {{ $row['submitted_at'] }}</div><div><strong>Verified:</strong> {{ $row['verified_at'] }}</div></td>
                                     <td style="min-width: 260px;">

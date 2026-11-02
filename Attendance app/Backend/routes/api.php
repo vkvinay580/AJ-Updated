@@ -7,6 +7,7 @@ use App\Http\Controllers\EmployeeAuthController;
 use App\Http\Controllers\EmployeeBranchOpeningController;
 use App\Http\Controllers\EmployeeDocumentController;
 use App\Http\Controllers\EmployeeIdCardController;
+use App\Http\Controllers\EmployeeIdentityDocumentController;
 use App\Http\Controllers\EmployeeNotificationController;
 use App\Http\Controllers\EmployeeRequestController;
 use App\Http\Controllers\TeTrackerController;
@@ -49,6 +50,9 @@ Route::get('/employee/documents/{employee}/{document}/download', [EmployeeDocume
 Route::get('/employee/generated-documents/{employee}/{type}/download', [EmployeeDocumentController::class, 'downloadGenerated'])
     ->middleware('signed:relative')
     ->name('employee.generated-documents.download');
+Route::get('/employee/identity-documents/{employee}/{type}', [EmployeeIdentityDocumentController::class, 'show'])
+    ->middleware('signed:relative')
+    ->name('employee.identity-documents.show');
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/employee/profile', [EmployeeAuthController::class, 'profile']);

@@ -14,6 +14,7 @@ use App\Models\OutsourceLocation;
 use App\Rules\DecodableImage;
 use App\Services\EmployeeBranchOpeningService;
 use App\Support\IdentityDetailGuard;
+use App\Support\IdentityDocumentStorage;
 use App\Support\MayPfEligibility;
 use App\Support\ShiftTimingFormatter;
 use Illuminate\Http\JsonResponse;
@@ -23,6 +24,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\ValidationException;
 use Intervention\Image\Laravel\Facades\Image;
 
@@ -166,6 +168,8 @@ class EmployeeAuthController extends Controller
 
         $hasAadhaarInput = $request->exists('aadhaarNumber');
         $hasPanInput = $request->exists('panNumber');
+        $hasAadhaarImage = $request->hasFile('aadhaarImage');
+        $hasPanImage = $request->hasFile('panImage');
         $panNumber = strtoupper($this->clean($request->input('panNumber')));
         $request->merge([
             'panNumber' => $panNumber !== '' ? $panNumber : null,
@@ -181,11 +185,13 @@ class EmployeeAuthController extends Controller
             'maritalStatus' => ['nullable', 'string', 'in:Single,Married,Divorced,Widowed'],
             'aadhaarNumber' => ['nullable', 'digits:12'],
             'panNumber' => ['nullable', 'regex:/^[A-Z]{5}[0-9]{4}[A-Z]$/'],
+            'aadhaarImage' => ['nullable', 'file', 'max:5120', new DecodableImage],
+            'panImage' => ['nullable', 'file', 'max:5120', new DecodableImage],
         ]);
 
         $detail = null;
 
-        if ($hasAadhaarInput || $hasPanInput) {
+        if ($hasAadhaarInput || $hasPanInput || $hasAadhaarImage || $hasPanImage) {
             $detail = $this->employeeDetail($employee) ?? $this->newEmployeeDetail($employee);
             $currentAadhaar = $this->clean($detail->aadhaarNo);
             $requestedAadhaar = $this->clean($data['aadhaarNumber'] ?? null);
@@ -205,6 +211,18 @@ class EmployeeAuthController extends Controller
                     'panNumber' => ['PAN number is already saved. Please request edit access and wait for admin verification to change it.'],
                 ]);
             }
+
+            if ($hasAadhaarImage && IdentityDocumentStorage::exists($detail->aadhaarDoc)) {
+                throw ValidationException::withMessages([
+                    'aadhaarImage' => ['Aadhaar card image is already saved. Please request edit access and wait for admin verification to replace it.'],
+                ]);
+            }
+
+            if ($hasPanImage && IdentityDocumentStorage::exists($detail->panDoc)) {
+                throw ValidationException::withMessages([
+                    'panImage' => ['PAN card image is already saved. Please request edit access and wait for admin verification to replace it.'],
+                ]);
+            }
         }
 
         $employee->name = $this->clean($data['name'] ?? null);
@@ -222,6 +240,24 @@ class EmployeeAuthController extends Controller
             }
             if ($hasPanInput && Schema::hasColumn('employeedetails', 'panNo') && $this->clean($detail->panNo) === '') {
                 $detail->panNo = strtoupper($this->clean($data['panNumber'] ?? null));
+            }
+            if ($hasAadhaarImage) {
+                $detail->aadhaarDoc = IdentityDocumentStorage::store(
+                    $request->file('aadhaarImage'),
+                    $employee,
+                    'aadhaar',
+                    'verified',
+                    $detail->aadhaarDoc
+                );
+            }
+            if ($hasPanImage) {
+                $detail->panDoc = IdentityDocumentStorage::store(
+                    $request->file('panImage'),
+                    $employee,
+                    'pan',
+                    'verified',
+                    $detail->panDoc
+                );
             }
             $detail->save();
         }
@@ -418,7 +454,7 @@ class EmployeeAuthController extends Controller
             'maritalStatus' => $this->clean($employee->marital_status),
             'aadhaarNumber' => $this->clean($detail?->aadhaarNo),
             'panNumber' => Schema::hasColumn('employeedetails', 'panNo') ? $this->clean($detail?->panNo) : '',
-            'identityDetails' => $this->identityDetailsPayload($detail, $identityDetailRequest),
+            'identityDetails' => $this->identityDetailsPayload($employee, $detail, $identityDetailRequest),
             'location' => $this->clean($employee->location),
             'designation' => $this->appDesignation($employee->designation),
             'photo' => $this->clean($employee->photo),
@@ -498,6 +534,7 @@ class EmployeeAuthController extends Controller
     }
 
     private function identityDetailsPayload(
+        Employee $employee,
         ?EmployeeDetail $detail,
         ?EmployeeIdentityDetailRequest $requestRecord
     ): array {
@@ -512,12 +549,35 @@ class EmployeeAuthController extends Controller
             'requestStatus' => $requestStatus,
             'requestNote' => $requestStatus === EmployeeIdentityDetailRequest::STATUS_VERIFIED ? '' : $this->clean($requestRecord?->request_note),
             'adminNote' => $requestStatus === EmployeeIdentityDetailRequest::STATUS_VERIFIED ? '' : $this->clean($requestRecord?->admin_note),
-            'canRequestEdit' => ($this->clean($detail?->aadhaarNo) !== '' || $this->clean($detail?->panNo) !== '')
+            'canRequestEdit' => ($this->clean($detail?->aadhaarNo) !== ''
+                    || $this->clean($detail?->panNo) !== ''
+                    || IdentityDocumentStorage::exists($detail?->aadhaarDoc)
+                    || IdentityDocumentStorage::exists($detail?->panDoc))
                 && in_array($requestStatus, ['none', EmployeeIdentityDetailRequest::STATUS_REJECTED, EmployeeIdentityDetailRequest::STATUS_VERIFIED], true),
             'canEdit' => $requestStatus === EmployeeIdentityDetailRequest::STATUS_APPROVED,
+            'aadhaarImageAvailable' => IdentityDocumentStorage::exists($detail?->aadhaarDoc),
+            'panImageAvailable' => IdentityDocumentStorage::exists($detail?->panDoc),
+            'aadhaarImageUrl' => $this->identityDocumentUrl($employee, 'aadhaar', $detail?->aadhaarDoc),
+            'panImageUrl' => $this->identityDocumentUrl($employee, 'pan', $detail?->panDoc),
             'pendingAadhaarNumber' => $hasPendingChanges ? $this->clean($requestRecord?->requested_aadhaar_no) : '',
             'pendingPanNumber' => $hasPendingChanges ? $this->clean($requestRecord?->requested_pan_no) : '',
+            'pendingAadhaarImageAvailable' => $hasPendingChanges && IdentityDocumentStorage::exists($requestRecord?->requested_aadhaar_doc),
+            'pendingPanImageAvailable' => $hasPendingChanges && IdentityDocumentStorage::exists($requestRecord?->requested_pan_doc),
         ];
+    }
+
+    private function identityDocumentUrl(Employee $employee, string $type, ?string $path): string
+    {
+        if (! IdentityDocumentStorage::exists($path)) {
+            return '';
+        }
+
+        return URL::temporarySignedRoute(
+            'employee.identity-documents.show',
+            now()->addMinutes(15),
+            ['employee' => $employee->getKey(), 'type' => $type],
+            false
+        );
     }
 
     private function syncEffectiveAdvance(Employee $employee): int
@@ -811,6 +871,12 @@ class EmployeeAuthController extends Controller
         $detail->aadhaarNo = '';
         if (Schema::hasColumn('employeedetails', 'panNo')) {
             $detail->panNo = '';
+        }
+        if (Schema::hasColumn('employeedetails', 'aadhaarDoc')) {
+            $detail->aadhaarDoc = '';
+        }
+        if (Schema::hasColumn('employeedetails', 'panDoc')) {
+            $detail->panDoc = '';
         }
         $detail->uanNumber = '';
         $detail->pfAmount = is_numeric($employee->pf) ? $employee->pf : 0;

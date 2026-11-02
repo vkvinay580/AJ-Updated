@@ -22,6 +22,7 @@ use App\Http\Controllers\Admin\TeTrackerController;
 use App\Http\Controllers\Admin\VmAttendanceController;
 use App\Http\Controllers\Admin\WorkVisitController;
 use App\Http\Controllers\EmployeeDocumentController;
+use App\Http\Controllers\EmployeeIdentityDocumentController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -98,6 +99,8 @@ Route::group(
                     Route::post('/salary/identity-detail-requests/{requestRecord}/approve', [IdentityDetailRequestController::class, 'approve'])->name('admin-identity-detail-requests-approve');
                     Route::post('/salary/identity-detail-requests/{requestRecord}/reject', [IdentityDetailRequestController::class, 'reject'])->name('admin-identity-detail-requests-reject');
                     Route::post('/salary/identity-detail-requests/{requestRecord}/verify', [IdentityDetailRequestController::class, 'verify'])->name('admin-identity-detail-requests-verify');
+                    Route::get('/salary/identity-detail-requests/current/{employee}/{type}', [EmployeeIdentityDocumentController::class, 'adminCurrent'])->name('admin-identity-detail-documents-current');
+                    Route::get('/salary/identity-detail-requests/requested/{requestRecord}/{type}', [EmployeeIdentityDocumentController::class, 'adminRequested'])->name('admin-identity-detail-documents-requested');
                     Route::get('/salary/reports', [AttendanceManagementController::class, 'reports'])->name('admin-salary-reports');
                     Route::post('/salary/reports/settings', [AttendanceManagementController::class, 'updateSalaryCalculationSettings'])->name('admin-salary-reports-settings');
                     Route::get('/salary/reports/export', [AttendanceManagementController::class, 'salaryReportExport'])->name('admin-salary-reports-export');

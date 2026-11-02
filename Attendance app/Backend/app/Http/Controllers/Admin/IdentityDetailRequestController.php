@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\EmployeeDetail;
 use App\Models\EmployeeIdentityDetailRequest;
 use App\Services\EmployeeNotificationDispatchService;
+use App\Support\IdentityDocumentStorage;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -106,6 +107,15 @@ class IdentityDetailRequestController extends Controller
             'approved_at' => now(),
         ]);
 
+        if ($wasSubmitted) {
+            IdentityDocumentStorage::delete($requestRecord->requested_aadhaar_doc);
+            IdentityDocumentStorage::delete($requestRecord->requested_pan_doc);
+            $requestRecord->update([
+                'requested_aadhaar_doc' => null,
+                'requested_pan_doc' => null,
+            ]);
+        }
+
         if ($requestRecord->employee) {
             $message = $wasSubmitted
                 ? 'Your submitted Aadhaar/PAN changes were rejected.'
@@ -144,6 +154,8 @@ class IdentityDetailRequestController extends Controller
 
         $adminNote = trim((string) ($data['admin_note'] ?? '')) ?: null;
         $admin = auth('admin')->user();
+        $oldAadhaarDoc = trim((string) $detail->aadhaarDoc);
+        $oldPanDoc = trim((string) $detail->panDoc);
 
         DB::transaction(function () use ($requestRecord, $detail, $adminNote, $admin): void {
             $requestedAadhaar = trim((string) $requestRecord->requested_aadhaar_no);
@@ -155,6 +167,12 @@ class IdentityDetailRequestController extends Controller
             if ($requestedPan !== '') {
                 $detail->panNo = $requestedPan;
             }
+            if (IdentityDocumentStorage::exists($requestRecord->requested_aadhaar_doc)) {
+                $detail->aadhaarDoc = $requestRecord->requested_aadhaar_doc;
+            }
+            if (IdentityDocumentStorage::exists($requestRecord->requested_pan_doc)) {
+                $detail->panDoc = $requestRecord->requested_pan_doc;
+            }
             $detail->save();
 
             $requestRecord->update([
@@ -164,6 +182,13 @@ class IdentityDetailRequestController extends Controller
                 'verified_at' => now(),
             ]);
         });
+
+        if ($oldAadhaarDoc !== '' && $oldAadhaarDoc !== trim((string) $detail->aadhaarDoc)) {
+            IdentityDocumentStorage::delete($oldAadhaarDoc);
+        }
+        if ($oldPanDoc !== '' && $oldPanDoc !== trim((string) $detail->panDoc)) {
+            IdentityDocumentStorage::delete($oldPanDoc);
+        }
 
         $message = 'Your Aadhaar/PAN changes were verified and saved successfully.';
         if ($adminNote !== null) {
@@ -241,6 +266,11 @@ class IdentityDetailRequestController extends Controller
             'current_pan_no' => trim((string) ($detail?->panNo ?? '')),
             'requested_aadhaar_no' => trim((string) $requestRecord->requested_aadhaar_no),
             'requested_pan_no' => trim((string) $requestRecord->requested_pan_no),
+            'current_aadhaar_image' => IdentityDocumentStorage::exists($detail?->aadhaarDoc),
+            'current_pan_image' => IdentityDocumentStorage::exists($detail?->panDoc),
+            'requested_aadhaar_image' => IdentityDocumentStorage::exists($requestRecord->requested_aadhaar_doc),
+            'requested_pan_image' => IdentityDocumentStorage::exists($requestRecord->requested_pan_doc),
+            'employee_id' => $employee?->id,
             'created_at' => $requestRecord->created_at?->format('d M Y h:i A') ?: '--',
             'approved_at' => $requestRecord->approved_at?->format('d M Y h:i A') ?: '--',
             'submitted_at' => $requestRecord->submitted_at?->format('d M Y h:i A') ?: '--',

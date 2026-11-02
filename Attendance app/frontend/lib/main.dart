@@ -3222,8 +3222,14 @@ class EmployeeIdentityDetails {
     required this.adminNote,
     required this.canRequestEdit,
     required this.canEdit,
+    required this.aadhaarImageAvailable,
+    required this.panImageAvailable,
+    required this.aadhaarImageUrl,
+    required this.panImageUrl,
     required this.pendingAadhaarNumber,
     required this.pendingPanNumber,
+    required this.pendingAadhaarImageAvailable,
+    required this.pendingPanImageAvailable,
   });
 
   final String requestStatus;
@@ -3231,12 +3237,20 @@ class EmployeeIdentityDetails {
   final String adminNote;
   final bool canRequestEdit;
   final bool canEdit;
+  final bool aadhaarImageAvailable;
+  final bool panImageAvailable;
+  final String aadhaarImageUrl;
+  final String panImageUrl;
   final String pendingAadhaarNumber;
   final String pendingPanNumber;
+  final bool pendingAadhaarImageAvailable;
+  final bool pendingPanImageAvailable;
 
   bool get hasPendingDetails =>
       pendingAadhaarNumber.trim().isNotEmpty ||
-      pendingPanNumber.trim().isNotEmpty;
+      pendingPanNumber.trim().isNotEmpty ||
+      pendingAadhaarImageAvailable ||
+      pendingPanImageAvailable;
 
   factory EmployeeIdentityDetails.fromJson(Map<String, dynamic> json) {
     return EmployeeIdentityDetails(
@@ -3245,8 +3259,16 @@ class EmployeeIdentityDetails {
       adminNote: json['adminNote']?.toString() ?? '',
       canRequestEdit: _parseBool(json['canRequestEdit']),
       canEdit: _parseBool(json['canEdit']),
+      aadhaarImageAvailable: _parseBool(json['aadhaarImageAvailable']),
+      panImageAvailable: _parseBool(json['panImageAvailable']),
+      aadhaarImageUrl: json['aadhaarImageUrl']?.toString() ?? '',
+      panImageUrl: json['panImageUrl']?.toString() ?? '',
       pendingAadhaarNumber: json['pendingAadhaarNumber']?.toString() ?? '',
       pendingPanNumber: json['pendingPanNumber']?.toString() ?? '',
+      pendingAadhaarImageAvailable: _parseBool(
+        json['pendingAadhaarImageAvailable'],
+      ),
+      pendingPanImageAvailable: _parseBool(json['pendingPanImageAvailable']),
     );
   }
 }
@@ -4864,26 +4886,41 @@ class EmployeeApiClient {
     required String maritalStatus,
     required String aadhaarNumber,
     required String panNumber,
+    File? aadhaarImage,
+    File? panImage,
   }) async {
-    final response = await http.post(
-      Uri.parse('${ApiConfig.baseUrl}/employee/profile'),
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode({
-        'name': name,
-        'contact': contact,
-        'mailId': mailId,
-        'address': address,
-        'dateOfBirth': dateOfBirth,
-        'gender': gender,
-        'maritalStatus': maritalStatus,
-        'aadhaarNumber': aadhaarNumber,
-        'panNumber': panNumber,
-      }),
-    );
+    final request =
+        http.MultipartRequest(
+            'POST',
+            Uri.parse('${ApiConfig.baseUrl}/employee/profile'),
+          )
+          ..headers.addAll({
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $token',
+          })
+          ..fields.addAll({
+            'name': name,
+            'contact': contact,
+            'mailId': mailId,
+            'address': address,
+            'dateOfBirth': dateOfBirth,
+            'gender': gender,
+            'maritalStatus': maritalStatus,
+            'aadhaarNumber': aadhaarNumber,
+            'panNumber': panNumber,
+          });
+    if (aadhaarImage != null) {
+      request.files.add(
+        await http.MultipartFile.fromPath('aadhaarImage', aadhaarImage.path),
+      );
+    }
+    if (panImage != null) {
+      request.files.add(
+        await http.MultipartFile.fromPath('panImage', panImage.path),
+      );
+    }
+
+    final response = await http.Response.fromStream(await request.send());
 
     final payload = _decodePayload(response);
 
@@ -4989,20 +5026,35 @@ class EmployeeApiClient {
     required String aadhaarNumber,
     required String panNumber,
     String requestNote = '',
+    File? aadhaarImage,
+    File? panImage,
   }) async {
-    final response = await http.post(
-      Uri.parse('${ApiConfig.baseUrl}/employee/identity-details'),
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode({
-        'aadhaar_number': aadhaarNumber,
-        'pan_number': panNumber,
-        'request_note': requestNote,
-      }),
-    );
+    final request =
+        http.MultipartRequest(
+            'POST',
+            Uri.parse('${ApiConfig.baseUrl}/employee/identity-details'),
+          )
+          ..headers.addAll({
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $token',
+          })
+          ..fields.addAll({
+            'aadhaar_number': aadhaarNumber,
+            'pan_number': panNumber,
+            'request_note': requestNote,
+          });
+    if (aadhaarImage != null) {
+      request.files.add(
+        await http.MultipartFile.fromPath('aadhaar_image', aadhaarImage.path),
+      );
+    }
+    if (panImage != null) {
+      request.files.add(
+        await http.MultipartFile.fromPath('pan_image', panImage.path),
+      );
+    }
+
+    final response = await http.Response.fromStream(await request.send());
 
     final payload = _decodePayload(response);
 
@@ -15282,6 +15334,8 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
   bool _biometricLockEnabled = false;
   bool _biometricAvailable = false;
   bool _isUpdatingBiometricLock = false;
+  File? _aadhaarImageFile;
+  File? _panImageFile;
   String? _selectedGender;
   String? _selectedMaritalStatus;
   DateTime? _selectedDateOfBirth;
@@ -15471,7 +15525,9 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
             _employee.maritalStatus.trim() ||
         _aadhaarController.text.trim() != _employee.aadhaarNumber.trim() ||
         _panController.text.trim().toUpperCase() !=
-            _employee.panNumber.trim().toUpperCase();
+            _employee.panNumber.trim().toUpperCase() ||
+        _aadhaarImageFile != null ||
+        _panImageFile != null;
   }
 
   Future<void> _refreshProfile({bool silent = false}) async {
@@ -15665,6 +15721,52 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
     }
   }
 
+  Future<File?> _pickIdentityCardImage(String title) async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+              child: Text(
+                title,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Take photo'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from gallery'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return null;
+
+    final image = await _imagePicker.pickImage(
+      source: source,
+      imageQuality: 90,
+      maxWidth: 2000,
+    );
+    return image == null ? null : File(image.path);
+  }
+
+  String _identityImageName(File file) => file.path.split('/').last;
+
   Future<void> _saveProfile() async {
     if (_isSavingProfile || !_formKey.currentState!.validate()) {
       return;
@@ -15688,12 +15790,18 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
         maritalStatus: (_selectedMaritalStatus ?? '').trim(),
         aadhaarNumber: _aadhaarController.text.trim(),
         panNumber: _panController.text.trim().toUpperCase(),
+        aadhaarImage: _aadhaarImageFile,
+        panImage: _panImageFile,
       );
 
       if (!mounted) {
         return;
       }
 
+      setState(() {
+        _aadhaarImageFile = null;
+        _panImageFile = null;
+      });
       _applyEmployee(updatedEmployee);
       ScaffoldMessenger.of(
         context,
@@ -15990,6 +16098,8 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
     );
     final noteController = TextEditingController(text: details.requestNote);
     final dialogFormKey = GlobalKey<FormState>();
+    File? selectedAadhaarImage;
+    File? selectedPanImage;
 
     try {
       await _showAryanDialog<void>(
@@ -16011,6 +16121,8 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
                       aadhaarNumber: aadhaarController.text.trim(),
                       panNumber: panController.text.trim().toUpperCase(),
                       requestNote: noteController.text.trim(),
+                      aadhaarImage: selectedAadhaarImage,
+                      panImage: selectedPanImage,
                     );
                 if (!mounted) return;
                 _applyEmployee(updatedEmployee, syncForm: false);
@@ -16075,6 +16187,47 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
                           return null;
                         },
                       ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          if (details.aadhaarImageAvailable)
+                            TextButton.icon(
+                              onPressed: () =>
+                                  _openDocument(details.aadhaarImageUrl),
+                              icon: const Icon(Icons.visibility_outlined),
+                              label: const Text('View current image'),
+                            ),
+                          const Spacer(),
+                          TextButton.icon(
+                            onPressed: _isSavingIdentityDetails
+                                ? null
+                                : () async {
+                                    final file = await _pickIdentityCardImage(
+                                      'Replace Aadhaar image',
+                                    );
+                                    if (file != null && context.mounted) {
+                                      setDialogState(
+                                        () => selectedAadhaarImage = file,
+                                      );
+                                    }
+                                  },
+                            icon: const Icon(Icons.add_a_photo_outlined),
+                            label: Text(
+                              selectedAadhaarImage == null
+                                  ? 'Choose image'
+                                  : 'Change image',
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (selectedAadhaarImage != null)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Selected: ${_identityImageName(selectedAadhaarImage!)}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: panController,
@@ -16103,6 +16256,47 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
                           return null;
                         },
                       ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          if (details.panImageAvailable)
+                            TextButton.icon(
+                              onPressed: () =>
+                                  _openDocument(details.panImageUrl),
+                              icon: const Icon(Icons.visibility_outlined),
+                              label: const Text('View current image'),
+                            ),
+                          const Spacer(),
+                          TextButton.icon(
+                            onPressed: _isSavingIdentityDetails
+                                ? null
+                                : () async {
+                                    final file = await _pickIdentityCardImage(
+                                      'Replace PAN image',
+                                    );
+                                    if (file != null && context.mounted) {
+                                      setDialogState(
+                                        () => selectedPanImage = file,
+                                      );
+                                    }
+                                  },
+                            icon: const Icon(Icons.add_a_photo_outlined),
+                            label: Text(
+                              selectedPanImage == null
+                                  ? 'Choose image'
+                                  : 'Change image',
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (selectedPanImage != null)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Selected: ${_identityImageName(selectedPanImage!)}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: noteController,
@@ -16169,6 +16363,50 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
       _ =>
         'Once saved, these identity numbers cannot be edited directly. Request edit access for corrections.',
     };
+  }
+
+  Widget _identityCardImageControl({
+    required String label,
+    required bool available,
+    required String url,
+    required File? selectedFile,
+    required ValueChanged<File> onSelected,
+  }) {
+    if (available) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          onPressed: () => _openDocument(url),
+          icon: const Icon(Icons.visibility_outlined),
+          label: Text('View $label card image'),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            selectedFile == null
+                ? 'No $label card image added'
+                : 'Selected: ${_identityImageName(selectedFile)}',
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        TextButton.icon(
+          onPressed: _isSavingProfile
+              ? null
+              : () async {
+                  final file = await _pickIdentityCardImage(
+                    'Add $label card image',
+                  );
+                  if (file != null && mounted) onSelected(file);
+                },
+          icon: const Icon(Icons.add_a_photo_outlined),
+          label: Text(selectedFile == null ? 'Add' : 'Change'),
+        ),
+      ],
+    );
   }
 
   Future<void> _requestBankEditAccess() async {
@@ -16701,15 +16939,16 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
 
   Future<void> _openDocument(String url) async {
     final trimmed = url.trim();
-    final uri = Uri.tryParse(trimmed);
+    final parsedUri = Uri.tryParse(trimmed);
 
-    if (trimmed.isEmpty || uri == null) {
+    if (trimmed.isEmpty || parsedUri == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Document link is not available.')),
       );
       return;
     }
 
+    final uri = Uri.parse(ApiConfig.baseUrl).resolveUri(parsedUri);
     final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
 
     if (!launched && mounted) {
@@ -16793,7 +17032,9 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
         .toLowerCase();
     final hasSavedIdentity =
         employee.aadhaarNumber.trim().isNotEmpty ||
-        employee.panNumber.trim().isNotEmpty;
+        employee.panNumber.trim().isNotEmpty ||
+        employee.identityDetails.aadhaarImageAvailable ||
+        employee.identityDetails.panImageAvailable;
     final genderOptions = _resolvedOptions(_genderOptions, _selectedGender);
     final maritalStatusOptions = _resolvedOptions(
       _maritalStatusOptions,
@@ -17123,6 +17364,16 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
                             },
                           ),
                         ),
+                        const SizedBox(height: 6),
+                        _identityCardImageControl(
+                          label: 'Aadhaar',
+                          available:
+                              employee.identityDetails.aadhaarImageAvailable,
+                          url: employee.identityDetails.aadhaarImageUrl,
+                          selectedFile: _aadhaarImageFile,
+                          onSelected: (file) =>
+                              setState(() => _aadhaarImageFile = file),
+                        ),
                         const SizedBox(height: 14),
                         _LabeledField(
                           label: 'PAN Number',
@@ -17163,6 +17414,15 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
                               return null;
                             },
                           ),
+                        ),
+                        const SizedBox(height: 6),
+                        _identityCardImageControl(
+                          label: 'PAN',
+                          available: employee.identityDetails.panImageAvailable,
+                          url: employee.identityDetails.panImageUrl,
+                          selectedFile: _panImageFile,
+                          onSelected: (file) =>
+                              setState(() => _panImageFile = file),
                         ),
                         const SizedBox(height: 14),
                         if (hasSavedIdentity) ...[

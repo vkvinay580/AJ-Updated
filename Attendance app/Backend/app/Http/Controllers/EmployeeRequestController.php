@@ -17,6 +17,7 @@ use App\Models\SiteVisitRequest;
 use App\Rules\DecodableImage;
 use App\Services\AttendanceClassificationService;
 use App\Support\AdvancePayrollWindow;
+use App\Support\IdentityDocumentStorage;
 use App\Support\MayPfEligibility;
 use App\Support\MayPfSecurityDeposit;
 use App\Support\PfSalaryBreakdown;
@@ -450,7 +451,10 @@ class EmployeeRequestController extends Controller
 
         $detail = $this->employeeDetail($employee);
 
-        if ($this->clean($detail?->aadhaarNo) === '' && $this->clean($detail?->panNo) === '') {
+        if ($this->clean($detail?->aadhaarNo) === ''
+            && $this->clean($detail?->panNo) === ''
+            && ! IdentityDocumentStorage::exists($detail?->aadhaarDoc)
+            && ! IdentityDocumentStorage::exists($detail?->panDoc)) {
             return response()->json([
                 'message' => 'Save your Aadhaar or PAN number once in your profile before requesting edit access.',
             ], 422);
@@ -504,6 +508,8 @@ class EmployeeRequestController extends Controller
             'aadhaar_number' => ['nullable', 'digits:12'],
             'pan_number' => ['nullable', 'regex:/^[A-Z]{5}[0-9]{4}[A-Z]$/'],
             'request_note' => ['nullable', 'string', 'max:2000'],
+            'aadhaar_image' => ['nullable', 'file', 'max:5120', new DecodableImage],
+            'pan_image' => ['nullable', 'file', 'max:5120', new DecodableImage],
         ]);
 
         $detail = $this->employeeDetail($employee);
@@ -512,10 +518,35 @@ class EmployeeRequestController extends Controller
         $requestedAadhaar = $this->clean($data['aadhaar_number'] ?? null) ?: $currentAadhaar;
         $requestedPan = strtoupper($this->clean($data['pan_number'] ?? null)) ?: $currentPan;
 
-        if ($requestedAadhaar === $currentAadhaar && $requestedPan === $currentPan) {
+        $hasAadhaarImage = $request->hasFile('aadhaar_image');
+        $hasPanImage = $request->hasFile('pan_image');
+
+        if ($requestedAadhaar === $currentAadhaar && $requestedPan === $currentPan
+            && ! $hasAadhaarImage && ! $hasPanImage) {
             return response()->json([
-                'message' => 'Enter a different Aadhaar or PAN number before submitting for verification.',
+                'message' => 'Enter a different Aadhaar/PAN number or choose a replacement card image before submitting for verification.',
             ], 422);
+        }
+
+        $requestedAadhaarDoc = $requestRecord->requested_aadhaar_doc;
+        $requestedPanDoc = $requestRecord->requested_pan_doc;
+        if ($hasAadhaarImage) {
+            $requestedAadhaarDoc = IdentityDocumentStorage::store(
+                $request->file('aadhaar_image'),
+                $employee,
+                'aadhaar',
+                'pending',
+                $requestedAadhaarDoc
+            );
+        }
+        if ($hasPanImage) {
+            $requestedPanDoc = IdentityDocumentStorage::store(
+                $request->file('pan_image'),
+                $employee,
+                'pan',
+                'pending',
+                $requestedPanDoc
+            );
         }
 
         $requestRecord->update([
@@ -523,6 +554,8 @@ class EmployeeRequestController extends Controller
             'request_note' => trim((string) ($data['request_note'] ?? $requestRecord->request_note)) ?: $requestRecord->request_note,
             'requested_aadhaar_no' => $requestedAadhaar,
             'requested_pan_no' => $requestedPan,
+            'requested_aadhaar_doc' => $requestedAadhaarDoc,
+            'requested_pan_doc' => $requestedPanDoc,
             'submitted_at' => now(),
         ]);
 
@@ -1123,6 +1156,8 @@ class EmployeeRequestController extends Controller
             'adminNote' => $this->clean($requestRecord->admin_note),
             'pendingAadhaarNumber' => $this->clean($requestRecord->requested_aadhaar_no),
             'pendingPanNumber' => $this->clean($requestRecord->requested_pan_no),
+            'pendingAadhaarImageAvailable' => IdentityDocumentStorage::exists($requestRecord->requested_aadhaar_doc),
+            'pendingPanImageAvailable' => IdentityDocumentStorage::exists($requestRecord->requested_pan_doc),
         ];
     }
 
