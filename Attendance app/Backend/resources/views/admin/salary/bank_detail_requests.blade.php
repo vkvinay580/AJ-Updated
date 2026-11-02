@@ -56,6 +56,11 @@
             <div class="alert alert-success border-0">{{ session('status') }}</div>
         @endif
 
+        <div class="d-flex flex-wrap gap-2 mb-4">
+            <a href="{{ route('admin-bank-detail-requests') }}" class="btn btn-primary">Bank Detail Requests</a>
+            <a href="{{ route('admin-identity-detail-requests') }}" class="btn btn-outline-primary">Aadhaar / PAN Requests</a>
+        </div>
+
         <div class="row g-3 mb-4">
             <div class="col-lg-3 col-md-6">
                 <div class="card rounded-4 mb-0 attendance-stat-card">

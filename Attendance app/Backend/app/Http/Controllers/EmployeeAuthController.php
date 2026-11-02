@@ -2,25 +2,27 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Branch;
 use App\Models\Attendance;
+use App\Models\Branch;
 use App\Models\Employee;
 use App\Models\EmployeeAdvanceTransaction;
 use App\Models\EmployeeAppCredential;
 use App\Models\EmployeeBankDetailRequest;
 use App\Models\EmployeeDetail;
+use App\Models\EmployeeIdentityDetailRequest;
 use App\Models\OutsourceLocation;
 use App\Rules\DecodableImage;
 use App\Services\EmployeeBranchOpeningService;
+use App\Support\IdentityDetailGuard;
 use App\Support\MayPfEligibility;
 use App\Support\ShiftTimingFormatter;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Intervention\Image\Laravel\Facades\Image;
 
@@ -129,7 +131,7 @@ class EmployeeAuthController extends Controller
         $employee->save();
 
         $employee->tokens()->delete();
-        $token = $employee->createToken('flutter-login', ['branch:' . $branchId])->plainTextToken;
+        $token = $employee->createToken('flutter-login', ['branch:'.$branchId])->plainTextToken;
 
         return response()->json([
             'token' => $token,
@@ -181,6 +183,30 @@ class EmployeeAuthController extends Controller
             'panNumber' => ['nullable', 'regex:/^[A-Z]{5}[0-9]{4}[A-Z]$/'],
         ]);
 
+        $detail = null;
+
+        if ($hasAadhaarInput || $hasPanInput) {
+            $detail = $this->employeeDetail($employee) ?? $this->newEmployeeDetail($employee);
+            $currentAadhaar = $this->clean($detail->aadhaarNo);
+            $requestedAadhaar = $this->clean($data['aadhaarNumber'] ?? null);
+            $currentPan = Schema::hasColumn('employeedetails', 'panNo')
+                ? strtoupper($this->clean($detail->panNo))
+                : '';
+            $requestedPan = strtoupper($this->clean($data['panNumber'] ?? null));
+
+            if ($hasAadhaarInput && ! IdentityDetailGuard::permitsDirectSave($currentAadhaar, $requestedAadhaar)) {
+                throw ValidationException::withMessages([
+                    'aadhaarNumber' => ['Aadhaar number is already saved. Please request edit access and wait for admin verification to change it.'],
+                ]);
+            }
+
+            if ($hasPanInput && ! IdentityDetailGuard::permitsDirectSave($currentPan, $requestedPan)) {
+                throw ValidationException::withMessages([
+                    'panNumber' => ['PAN number is already saved. Please request edit access and wait for admin verification to change it.'],
+                ]);
+            }
+        }
+
         $employee->name = $this->clean($data['name'] ?? null);
         $employee->contact = $this->clean($data['contact'] ?? null);
         $employee->mailId = $this->clean($data['mailId'] ?? null);
@@ -190,12 +216,11 @@ class EmployeeAuthController extends Controller
         $employee->marital_status = $this->clean($data['maritalStatus'] ?? null);
         $employee->save();
 
-        if ($hasAadhaarInput || $hasPanInput) {
-            $detail = $this->employeeDetail($employee) ?? $this->newEmployeeDetail($employee);
-            if ($hasAadhaarInput) {
+        if ($detail) {
+            if ($hasAadhaarInput && $this->clean($detail->aadhaarNo) === '') {
                 $detail->aadhaarNo = $this->clean($data['aadhaarNumber'] ?? null);
             }
-            if ($hasPanInput && Schema::hasColumn('employeedetails', 'panNo')) {
+            if ($hasPanInput && Schema::hasColumn('employeedetails', 'panNo') && $this->clean($detail->panNo) === '') {
                 $detail->panNo = strtoupper($this->clean($data['panNumber'] ?? null));
             }
             $detail->save();
@@ -356,6 +381,7 @@ class EmployeeAuthController extends Controller
         $effectiveAdvance = $this->syncEffectiveAdvance($employee);
         $detail = $this->employeeDetail($employee);
         $bankDetailRequest = $this->latestBankDetailRequest($employee);
+        $identityDetailRequest = $this->latestIdentityDetailRequest($employee);
         $resolvedBranchId = $this->clean($branch?->branchId)
             ?: $this->clean($outsourceLocation?->location_code)
             ?: $this->clean($branchId)
@@ -392,6 +418,7 @@ class EmployeeAuthController extends Controller
             'maritalStatus' => $this->clean($employee->marital_status),
             'aadhaarNumber' => $this->clean($detail?->aadhaarNo),
             'panNumber' => Schema::hasColumn('employeedetails', 'panNo') ? $this->clean($detail?->panNo) : '',
+            'identityDetails' => $this->identityDetailsPayload($detail, $identityDetailRequest),
             'location' => $this->clean($employee->location),
             'designation' => $this->appDesignation($employee->designation),
             'photo' => $this->clean($employee->photo),
@@ -467,6 +494,29 @@ class EmployeeAuthController extends Controller
             'pendingIfscCode' => $hasPendingSubmittedChanges ? $this->clean($requestRecord?->requested_ifsc_code) : '',
             'pendingUanNumber' => $hasPendingSubmittedChanges ? $this->clean($requestRecord?->requested_uan_number) : '',
             'pendingPassbookDocUrl' => $hasPendingSubmittedChanges ? $this->resolvePhotoUrl($requestRecord?->requested_passbook_doc) : '',
+        ];
+    }
+
+    private function identityDetailsPayload(
+        ?EmployeeDetail $detail,
+        ?EmployeeIdentityDetailRequest $requestRecord
+    ): array {
+        $status = strtolower($this->clean($requestRecord?->status));
+        $requestStatus = $status !== '' ? $status : 'none';
+        $hasPendingChanges = in_array($requestStatus, [
+            EmployeeIdentityDetailRequest::STATUS_APPROVED,
+            EmployeeIdentityDetailRequest::STATUS_SUBMITTED,
+        ], true);
+
+        return [
+            'requestStatus' => $requestStatus,
+            'requestNote' => $requestStatus === EmployeeIdentityDetailRequest::STATUS_VERIFIED ? '' : $this->clean($requestRecord?->request_note),
+            'adminNote' => $requestStatus === EmployeeIdentityDetailRequest::STATUS_VERIFIED ? '' : $this->clean($requestRecord?->admin_note),
+            'canRequestEdit' => ($this->clean($detail?->aadhaarNo) !== '' || $this->clean($detail?->panNo) !== '')
+                && in_array($requestStatus, ['none', EmployeeIdentityDetailRequest::STATUS_REJECTED, EmployeeIdentityDetailRequest::STATUS_VERIFIED], true),
+            'canEdit' => $requestStatus === EmployeeIdentityDetailRequest::STATUS_APPROVED,
+            'pendingAadhaarNumber' => $hasPendingChanges ? $this->clean($requestRecord?->requested_aadhaar_no) : '',
+            'pendingPanNumber' => $hasPendingChanges ? $this->clean($requestRecord?->requested_pan_no) : '',
         ];
     }
 
@@ -731,7 +781,7 @@ class EmployeeAuthController extends Controller
 
     private function newEmployeeDetail(Employee $employee): EmployeeDetail
     {
-        $detail = new EmployeeDetail();
+        $detail = new EmployeeDetail;
         $now = Carbon::now(config('app.timezone', 'Asia/Kolkata'));
 
         $detail->employeeId = $this->clean($employee->empId);
@@ -776,6 +826,18 @@ class EmployeeAuthController extends Controller
             ->first();
     }
 
+    private function latestIdentityDetailRequest(Employee $employee): ?EmployeeIdentityDetailRequest
+    {
+        if (! Schema::hasTable('employee_identity_detail_requests')) {
+            return null;
+        }
+
+        return EmployeeIdentityDetailRequest::query()
+            ->where('employee_id', $employee->id)
+            ->latest('id')
+            ->first();
+    }
+
     private function storeEmployeePhoto($image, Employee $employee, ?string $existingPhoto): string
     {
         $directory = public_path('storage/ProfileImage');
@@ -804,8 +866,8 @@ class EmployeeAuthController extends Controller
 
         Image::read($image)
             ->cover(512, 512)
-            ->save($directory . '/' . $filename);
+            ->save($directory.'/'.$filename);
 
-        return 'storage/ProfileImage/' . $filename;
+        return 'storage/ProfileImage/'.$filename;
     }
 }

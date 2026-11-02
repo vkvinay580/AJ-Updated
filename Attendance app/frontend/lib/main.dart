@@ -2675,6 +2675,7 @@ class Employee {
     required this.maritalStatus,
     required this.aadhaarNumber,
     required this.panNumber,
+    required this.identityDetails,
     required this.location,
     required this.designation,
     required this.photo,
@@ -2723,6 +2724,7 @@ class Employee {
   final String maritalStatus;
   final String aadhaarNumber;
   final String panNumber;
+  final EmployeeIdentityDetails identityDetails;
   final String location;
   final String designation;
   final String photo;
@@ -2826,6 +2828,13 @@ class Employee {
           json['pan_number']?.toString() ??
           json['panNo']?.toString() ??
           '',
+      identityDetails: EmployeeIdentityDetails.fromJson(
+        json['identityDetails'] is Map<String, dynamic>
+            ? json['identityDetails'] as Map<String, dynamic>
+            : json['identityDetails'] is Map
+            ? Map<String, dynamic>.from(json['identityDetails'] as Map)
+            : const <String, dynamic>{},
+      ),
       location: json['location']?.toString() ?? '',
       designation: json['designation']?.toString() ?? '',
       photo: json['photo']?.toString() ?? '',
@@ -2902,6 +2911,7 @@ class Employee {
     String? maritalStatus,
     String? aadhaarNumber,
     String? panNumber,
+    EmployeeIdentityDetails? identityDetails,
     String? location,
     String? designation,
     String? photo,
@@ -2950,6 +2960,7 @@ class Employee {
       maritalStatus: maritalStatus ?? this.maritalStatus,
       aadhaarNumber: aadhaarNumber ?? this.aadhaarNumber,
       panNumber: panNumber ?? this.panNumber,
+      identityDetails: identityDetails ?? this.identityDetails,
       location: location ?? this.location,
       designation: designation ?? this.designation,
       photo: photo ?? this.photo,
@@ -3200,6 +3211,42 @@ class EmployeeBankDetails {
       pendingIfscCode: json['pendingIfscCode']?.toString() ?? '',
       pendingUanNumber: json['pendingUanNumber']?.toString() ?? '',
       pendingPassbookDocUrl: json['pendingPassbookDocUrl']?.toString() ?? '',
+    );
+  }
+}
+
+class EmployeeIdentityDetails {
+  const EmployeeIdentityDetails({
+    required this.requestStatus,
+    required this.requestNote,
+    required this.adminNote,
+    required this.canRequestEdit,
+    required this.canEdit,
+    required this.pendingAadhaarNumber,
+    required this.pendingPanNumber,
+  });
+
+  final String requestStatus;
+  final String requestNote;
+  final String adminNote;
+  final bool canRequestEdit;
+  final bool canEdit;
+  final String pendingAadhaarNumber;
+  final String pendingPanNumber;
+
+  bool get hasPendingDetails =>
+      pendingAadhaarNumber.trim().isNotEmpty ||
+      pendingPanNumber.trim().isNotEmpty;
+
+  factory EmployeeIdentityDetails.fromJson(Map<String, dynamic> json) {
+    return EmployeeIdentityDetails(
+      requestStatus: json['requestStatus']?.toString() ?? 'none',
+      requestNote: json['requestNote']?.toString() ?? '',
+      adminNote: json['adminNote']?.toString() ?? '',
+      canRequestEdit: _parseBool(json['canRequestEdit']),
+      canEdit: _parseBool(json['canEdit']),
+      pendingAadhaarNumber: json['pendingAadhaarNumber']?.toString() ?? '',
+      pendingPanNumber: json['pendingPanNumber']?.toString() ?? '',
     );
   }
 }
@@ -4908,6 +4955,64 @@ class EmployeeApiClient {
     throw _buildApiException(
       payload,
       fallback: 'Unable to submit the bank edit request right now.',
+    );
+  }
+
+  Future<Employee> requestIdentityDetailEdit({
+    required String token,
+    String requestNote = '',
+  }) async {
+    final response = await http.post(
+      Uri.parse('${ApiConfig.baseUrl}/employee/identity-details/request'),
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'request_note': requestNote}),
+    );
+
+    final payload = _decodePayload(response);
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return profile(token);
+    }
+
+    throw _buildApiException(
+      payload,
+      fallback: 'Unable to submit the Aadhaar/PAN edit request right now.',
+    );
+  }
+
+  Future<Employee> updateIdentityDetails({
+    required String token,
+    required String aadhaarNumber,
+    required String panNumber,
+    String requestNote = '',
+  }) async {
+    final response = await http.post(
+      Uri.parse('${ApiConfig.baseUrl}/employee/identity-details'),
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'aadhaar_number': aadhaarNumber,
+        'pan_number': panNumber,
+        'request_note': requestNote,
+      }),
+    );
+
+    final payload = _decodePayload(response);
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return profile(token);
+    }
+
+    throw _buildApiException(
+      payload,
+      fallback: 'Unable to submit Aadhaar/PAN details right now.',
     );
   }
 
@@ -15167,6 +15272,8 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
   bool _isUploadingPhoto = false;
   bool _isSavingProfile = false;
   bool _isSavingUanNumber = false;
+  bool _isRequestingIdentityEdit = false;
+  bool _isSavingIdentityDetails = false;
   bool _isRequestingBankEdit = false;
   bool _isSavingBankDetails = false;
   bool _isRefreshingProfile = false;
@@ -15798,6 +15905,272 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _requestIdentityEditAccess() async {
+    if (_isRequestingIdentityEdit) return;
+
+    final noteController = TextEditingController();
+    try {
+      final shouldSubmit = await _showAryanDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Request Aadhaar / PAN Edit'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Saved Aadhaar and PAN numbers are locked. Ask an administrator for edit access, then submit the correction for verification.',
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: noteController,
+                minLines: 2,
+                maxLines: 4,
+                decoration: const InputDecoration(
+                  labelText: 'Request Note',
+                  hintText: 'Explain why the correction is needed',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Submit Request'),
+            ),
+          ],
+        ),
+      );
+
+      if (shouldSubmit != true || !mounted) return;
+      setState(() => _isRequestingIdentityEdit = true);
+      final updatedEmployee = await widget.apiClient.requestIdentityDetailEdit(
+        token: widget.token,
+        requestNote: noteController.text.trim(),
+      );
+      if (!mounted) return;
+      _applyEmployee(updatedEmployee, syncForm: false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Aadhaar/PAN edit request submitted.')),
+      );
+    } on ApiException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to submit the edit request.')),
+        );
+      }
+    } finally {
+      noteController.dispose();
+      if (mounted) setState(() => _isRequestingIdentityEdit = false);
+    }
+  }
+
+  Future<void> _showIdentityDetailsEditor() async {
+    if (_isSavingIdentityDetails) return;
+
+    final details = _employee.identityDetails;
+    final aadhaarController = TextEditingController(
+      text: details.pendingAadhaarNumber.trim().isNotEmpty
+          ? details.pendingAadhaarNumber
+          : _employee.aadhaarNumber,
+    );
+    final panController = TextEditingController(
+      text: details.pendingPanNumber.trim().isNotEmpty
+          ? details.pendingPanNumber
+          : _employee.panNumber,
+    );
+    final noteController = TextEditingController(text: details.requestNote);
+    final dialogFormKey = GlobalKey<FormState>();
+
+    try {
+      await _showAryanDialog<void>(
+        context: context,
+        barrierDismissible: !_isSavingIdentityDetails,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setDialogState) {
+            Future<void> submit() async {
+              if (_isSavingIdentityDetails ||
+                  !(dialogFormKey.currentState?.validate() ?? false)) {
+                return;
+              }
+              setState(() => _isSavingIdentityDetails = true);
+              setDialogState(() {});
+              try {
+                final updatedEmployee = await widget.apiClient
+                    .updateIdentityDetails(
+                      token: widget.token,
+                      aadhaarNumber: aadhaarController.text.trim(),
+                      panNumber: panController.text.trim().toUpperCase(),
+                      requestNote: noteController.text.trim(),
+                    );
+                if (!mounted) return;
+                _applyEmployee(updatedEmployee, syncForm: false);
+                if (context.mounted) Navigator.of(context).pop();
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Aadhaar/PAN changes submitted for verification.',
+                    ),
+                  ),
+                );
+              } on ApiException catch (error) {
+                if (mounted) {
+                  ScaffoldMessenger.of(
+                    this.context,
+                  ).showSnackBar(SnackBar(content: Text(error.message)));
+                }
+              } catch (_) {
+                if (mounted) {
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Unable to submit Aadhaar/PAN details.'),
+                    ),
+                  );
+                }
+              } finally {
+                if (mounted) {
+                  setState(() => _isSavingIdentityDetails = false);
+                  if (context.mounted) setDialogState(() {});
+                }
+              }
+            }
+
+            return AlertDialog(
+              title: const Text('Edit Aadhaar / PAN'),
+              content: Form(
+                key: dialogFormKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'The saved values will change only after an administrator verifies this submission.',
+                      ),
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: aadhaarController,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(12),
+                        ],
+                        decoration: const InputDecoration(
+                          labelText: 'Aadhaar Number',
+                        ),
+                        validator: (value) {
+                          final text = value?.trim() ?? '';
+                          if (text.isNotEmpty &&
+                              !RegExp(r'^\d{12}$').hasMatch(text)) {
+                            return 'Enter a valid 12-digit Aadhaar number.';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: panController,
+                        textCapitalization: TextCapitalization.characters,
+                        inputFormatters: [
+                          TextInputFormatter.withFunction(
+                            (oldValue, newValue) => newValue.copyWith(
+                              text: newValue.text.toUpperCase(),
+                              selection: newValue.selection,
+                              composing: TextRange.empty,
+                            ),
+                          ),
+                          LengthLimitingTextInputFormatter(10),
+                        ],
+                        decoration: const InputDecoration(
+                          labelText: 'PAN Number',
+                        ),
+                        validator: (value) {
+                          final text = (value ?? '').trim().toUpperCase();
+                          if (text.isNotEmpty &&
+                              !RegExp(
+                                r'^[A-Z]{5}[0-9]{4}[A-Z]$',
+                              ).hasMatch(text)) {
+                            return 'Enter a valid PAN number.';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: noteController,
+                        minLines: 2,
+                        maxLines: 4,
+                        decoration: const InputDecoration(
+                          labelText: 'Verification Note',
+                          hintText: 'Optional explanation for the correction',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: _isSavingIdentityDetails
+                      ? null
+                      : () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: _isSavingIdentityDetails ? null : submit,
+                  child: Text(
+                    _isSavingIdentityDetails ? 'Submitting...' : 'Submit',
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    } finally {
+      aadhaarController.dispose();
+      panController.dispose();
+      noteController.dispose();
+      if (mounted) setState(() => _isSavingIdentityDetails = false);
+    }
+  }
+
+  String _identityRequestTitle(String status) {
+    return switch (status.trim().toLowerCase()) {
+      'pending' => 'Edit Access Requested',
+      'approved' => 'Edit Access Approved',
+      'submitted' => 'Pending Admin Verification',
+      'verified' => 'Aadhaar / PAN Verified',
+      'rejected' => 'Request Rejected',
+      _ => 'Aadhaar / PAN Locked After Saving',
+    };
+  }
+
+  String _identityRequestDescription(String status) {
+    return switch (status.trim().toLowerCase()) {
+      'pending' =>
+        'An administrator must approve your request before you can submit corrected details.',
+      'approved' =>
+        'You can now submit corrected Aadhaar/PAN details. Existing values remain unchanged until verification.',
+      'submitted' =>
+        'Your corrected details are waiting for administrator verification. Existing verified values remain active.',
+      'verified' =>
+        'Your last Aadhaar/PAN correction was verified. Submit a new request for any further change.',
+      'rejected' =>
+        'The request was rejected. You can submit another request with a clear reason.',
+      _ =>
+        'Once saved, these identity numbers cannot be edited directly. Request edit access for corrections.',
+    };
+  }
+
   Future<void> _requestBankEditAccess() async {
     if (_isRequestingBankEdit) {
       return;
@@ -16418,6 +16791,9 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
     final bankRequestStatus = employee.bankDetails.requestStatus
         .trim()
         .toLowerCase();
+    final hasSavedIdentity =
+        employee.aadhaarNumber.trim().isNotEmpty ||
+        employee.panNumber.trim().isNotEmpty;
     final genderOptions = _resolvedOptions(_genderOptions, _selectedGender);
     final maritalStatusOptions = _resolvedOptions(
       _maritalStatusOptions,
@@ -16720,6 +17096,7 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
                           label: 'Aadhaar Number',
                           child: TextFormField(
                             controller: _aadhaarController,
+                            readOnly: employee.aadhaarNumber.trim().isNotEmpty,
                             keyboardType: TextInputType.number,
                             textInputAction: TextInputAction.next,
                             inputFormatters: [
@@ -16729,6 +17106,10 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
                             decoration: _fieldDecoration(
                               hintText: 'Enter 12-digit Aadhaar number',
                               prefixIcon: Icons.credit_card_rounded,
+                              suffixIcon:
+                                  employee.aadhaarNumber.trim().isNotEmpty
+                                  ? const Icon(Icons.lock_outline_rounded)
+                                  : null,
                             ),
                             validator: (value) {
                               final trimmed = value?.trim() ?? '';
@@ -16747,6 +17128,7 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
                           label: 'PAN Number',
                           child: TextFormField(
                             controller: _panController,
+                            readOnly: employee.panNumber.trim().isNotEmpty,
                             textCapitalization: TextCapitalization.characters,
                             textInputAction: TextInputAction.next,
                             inputFormatters: [
@@ -16762,6 +17144,9 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
                             decoration: _fieldDecoration(
                               hintText: 'Enter PAN number',
                               prefixIcon: Icons.badge_outlined,
+                              suffixIcon: employee.panNumber.trim().isNotEmpty
+                                  ? const Icon(Icons.lock_outline_rounded)
+                                  : null,
                             ),
                             validator: (value) {
                               final trimmed = (value ?? '')
@@ -16780,6 +17165,49 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
                           ),
                         ),
                         const SizedBox(height: 14),
+                        if (hasSavedIdentity) ...[
+                          _InlineInfoCard(
+                            backgroundColor: AppColors.primarySoft,
+                            icon: Icons.verified_user_outlined,
+                            iconColor: AppColors.primaryDark,
+                            title: _identityRequestTitle(
+                              employee.identityDetails.requestStatus,
+                            ),
+                            subtitle:
+                                '${_identityRequestDescription(employee.identityDetails.requestStatus)}${employee.identityDetails.adminNote.trim().isEmpty ? '' : '\nAdmin note: ${employee.identityDetails.adminNote.trim()}'}',
+                            action: employee.identityDetails.canEdit
+                                ? FilledButton(
+                                    onPressed: _isSavingIdentityDetails
+                                        ? null
+                                        : _showIdentityDetailsEditor,
+                                    child: Text(
+                                      _isSavingIdentityDetails
+                                          ? 'Submitting...'
+                                          : 'Edit Aadhaar / PAN',
+                                    ),
+                                  )
+                                : employee.identityDetails.canRequestEdit
+                                ? TextButton(
+                                    onPressed: _isRequestingIdentityEdit
+                                        ? null
+                                        : _requestIdentityEditAccess,
+                                    child: Text(
+                                      _isRequestingIdentityEdit
+                                          ? 'Submitting...'
+                                          : employee
+                                                    .identityDetails
+                                                    .requestStatus
+                                                    .trim()
+                                                    .toLowerCase() ==
+                                                'rejected'
+                                          ? 'Request Edit Again'
+                                          : 'Request Edit Access',
+                                    ),
+                                  )
+                                : null,
+                          ),
+                          const SizedBox(height: 14),
+                        ],
                         LayoutBuilder(
                           builder: (context, constraints) {
                             final useVerticalLayout =

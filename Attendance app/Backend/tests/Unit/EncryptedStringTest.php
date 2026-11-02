@@ -5,6 +5,7 @@ namespace Tests\Unit;
 use App\Casts\EncryptedString;
 use App\Casts\EncryptedStringOrEmpty;
 use App\Models\EmployeeDetail;
+use App\Models\EmployeeIdentityDetailRequest;
 use Tests\TestCase;
 
 class EncryptedStringTest extends TestCase
@@ -37,5 +38,13 @@ class EncryptedStringTest extends TestCase
         $cast = new EncryptedString;
 
         $this->assertNull($cast->set(new \stdClass, 'requested_uan_number', '', []));
+    }
+
+    public function test_pending_identity_corrections_use_encrypted_casts(): void
+    {
+        $casts = (new EmployeeIdentityDetailRequest)->getCasts();
+
+        $this->assertSame(EncryptedString::class, $casts['requested_aadhaar_no']);
+        $this->assertSame(EncryptedString::class, $casts['requested_pan_no']);
     }
 }

@@ -48,6 +48,7 @@
             'salary.advance_import' => request()->routeIs('admin-salary-advance-import-page'),
             'salary.advance_requests' => request()->routeIs('admin-salary-advance-requests'),
             'salary.advance' => request()->routeIs('admin-salary-advance', 'admin-salary-advance-history*'),
+            'salary.bank_requests' => request()->routeIs('admin-bank-detail-requests*', 'admin-identity-detail-requests*'),
             default => request()->routeIs($routeMap[$item['key']].'*'),
         };
     };

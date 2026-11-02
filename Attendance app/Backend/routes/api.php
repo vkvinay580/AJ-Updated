@@ -60,6 +60,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/employee/uan-number', [EmployeeRequestController::class, 'submitInitialUanNumber']);
     Route::post('/employee/bank-details/request', [EmployeeRequestController::class, 'requestBankDetailEdit']);
     Route::post('/employee/bank-details', [EmployeeRequestController::class, 'submitBankDetails']);
+    Route::post('/employee/identity-details/request', [EmployeeRequestController::class, 'requestIdentityDetailEdit']);
+    Route::post('/employee/identity-details', [EmployeeRequestController::class, 'submitIdentityDetails']);
     Route::post('/employee/logout', [EmployeeAuthController::class, 'logout']);
     Route::get('/employee/id-card', [EmployeeIdCardController::class, 'show']);
     Route::post('/employee/id-card', [EmployeeIdCardController::class, 'store']);

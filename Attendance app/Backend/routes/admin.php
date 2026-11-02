@@ -1,16 +1,18 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Admin\AdminMessengerController;
 use App\Http\Controllers\Admin\AdminNotificationController;
 use App\Http\Controllers\Admin\AttendanceManagementController;
 use App\Http\Controllers\Admin\BankDetailRequestController;
+use App\Http\Controllers\Admin\BirthdayCalendarController;
+use App\Http\Controllers\Admin\BirthdaySmsController;
 use App\Http\Controllers\Admin\BranchController;
 use App\Http\Controllers\Admin\BranchOpeningController;
 use App\Http\Controllers\Admin\EmployeeController;
-use App\Http\Controllers\EmployeeDocumentController;
 use App\Http\Controllers\Admin\EmployeePasswordController;
+use App\Http\Controllers\Admin\IdCardController;
+use App\Http\Controllers\Admin\IdentityDetailRequestController;
 use App\Http\Controllers\Admin\LeaveController;
 use App\Http\Controllers\Admin\NightShiftUserController;
 use App\Http\Controllers\Admin\OutsourceLocationController;
@@ -18,10 +20,9 @@ use App\Http\Controllers\Admin\RecruitmentController;
 use App\Http\Controllers\Admin\SalaryController;
 use App\Http\Controllers\Admin\TeTrackerController;
 use App\Http\Controllers\Admin\VmAttendanceController;
-use App\Http\Controllers\Admin\IdCardController;
 use App\Http\Controllers\Admin\WorkVisitController;
-use App\Http\Controllers\Admin\BirthdaySmsController;
-use App\Http\Controllers\Admin\BirthdayCalendarController;
+use App\Http\Controllers\EmployeeDocumentController;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -35,9 +36,8 @@ use App\Http\Controllers\Admin\BirthdayCalendarController;
 */
 
 Route::get('/test', function () {
-    return "Abhiram";
+    return 'Abhiram';
 });
-
 
 Route::group(
     ['prefix' => 'admin'],
@@ -54,11 +54,11 @@ Route::group(
             ['middleware' => ['auth:admin', 'csr.manager']],
             function () {
                 Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('admin-dashboard');
-                Route::get('/logout', [Admincontroller::class, 'adminLogout'])->name('admin-logout');
-                Route::get('/profile', [Admincontroller::class, 'adminProfile'])->name('admin-profile');
+                Route::get('/logout', [AdminController::class, 'adminLogout'])->name('admin-logout');
+                Route::get('/profile', [AdminController::class, 'adminProfile'])->name('admin-profile');
                 Route::post('/profile/update/details', [AdminController::class, 'adminProfileDetailsUpdate'])->name('admin-profile-details-update');
                 Route::post('/profile/update/theme', [AdminController::class, 'adminThemeUpdate'])->name('admin-profile-theme-update');
-                Route::get('/change/password', [Admincontroller::class, 'changePassword'])->name('admin-change-password');
+                Route::get('/change/password', [AdminController::class, 'changePassword'])->name('admin-change-password');
                 Route::post('/update/password', [AdminController::class, 'updatePassword'])->name('admin-password-update');
                 Route::post('/employee/{id}/csr-shift-timing', [EmployeeController::class, 'updateCsrShiftTiming'])
                     ->name('admin-csr-employee-shift-update');
@@ -94,6 +94,10 @@ Route::group(
                     Route::post('/salary/bank-detail-requests/{requestRecord}/approve', [BankDetailRequestController::class, 'approve'])->name('admin-bank-detail-requests-approve');
                     Route::post('/salary/bank-detail-requests/{requestRecord}/reject', [BankDetailRequestController::class, 'reject'])->name('admin-bank-detail-requests-reject');
                     Route::post('/salary/bank-detail-requests/{requestRecord}/verify', [BankDetailRequestController::class, 'verify'])->name('admin-bank-detail-requests-verify');
+                    Route::get('/salary/identity-detail-requests', [IdentityDetailRequestController::class, 'index'])->name('admin-identity-detail-requests');
+                    Route::post('/salary/identity-detail-requests/{requestRecord}/approve', [IdentityDetailRequestController::class, 'approve'])->name('admin-identity-detail-requests-approve');
+                    Route::post('/salary/identity-detail-requests/{requestRecord}/reject', [IdentityDetailRequestController::class, 'reject'])->name('admin-identity-detail-requests-reject');
+                    Route::post('/salary/identity-detail-requests/{requestRecord}/verify', [IdentityDetailRequestController::class, 'verify'])->name('admin-identity-detail-requests-verify');
                     Route::get('/salary/reports', [AttendanceManagementController::class, 'reports'])->name('admin-salary-reports');
                     Route::post('/salary/reports/settings', [AttendanceManagementController::class, 'updateSalaryCalculationSettings'])->name('admin-salary-reports-settings');
                     Route::get('/salary/reports/export', [AttendanceManagementController::class, 'salaryReportExport'])->name('admin-salary-reports-export');
@@ -224,19 +228,14 @@ Route::group(
                     Route::post('/work-visits/review/update', [WorkVisitController::class, 'updateStatus'])->name('admin-work-visits-review-update');
                     Route::get('/work-visits/reports', [WorkVisitController::class, 'reports'])->name('admin-work-visits-reports');
 
-
                     Route::get('/create', [AdminController::class, 'adminCreate'])->name('admin-create');
                     Route::post('/store', [AdminController::class, 'adminStore'])->name('admin-store');
                     Route::get('/index', [AdminController::class, 'adminIndex'])->name('admin-index');
                     Route::get('/edit/{id}', [AdminController::class, 'adminEdit'])->name('admin-edit');
                     Route::post('/update/{id}', [AdminController::class, 'adminUpdate'])->name('admin-update');
 
-
                 });
             }
-
-
-
 
         );
     }

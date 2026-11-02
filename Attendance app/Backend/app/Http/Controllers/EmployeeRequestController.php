@@ -4,14 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Models\Attendance;
 use App\Models\AttendanceDayOverride;
-use App\Models\SalaryCalculationSetting;
 use App\Models\Branch;
 use App\Models\Employee;
 use App\Models\EmployeeAdvanceRequest;
 use App\Models\EmployeeAdvanceTransaction;
 use App\Models\EmployeeBankDetailRequest;
 use App\Models\EmployeeDetail;
+use App\Models\EmployeeIdentityDetailRequest;
 use App\Models\LeaveRequest;
+use App\Models\SalaryCalculationSetting;
 use App\Models\SiteVisitRequest;
 use App\Rules\DecodableImage;
 use App\Services\AttendanceClassificationService;
@@ -46,8 +47,7 @@ class EmployeeRequestController extends Controller
 
     public function __construct(
         private readonly AttendanceClassificationService $attendanceClassificationService
-    ) {
-    }
+    ) {}
 
     public function salarySummary(Request $request): JsonResponse
     {
@@ -438,6 +438,100 @@ class EmployeeRequestController extends Controller
         ], 201);
     }
 
+    public function requestIdentityDetailEdit(Request $request): JsonResponse
+    {
+        $employee = $request->user();
+
+        abort_unless($employee instanceof Employee, 401);
+
+        $data = $request->validate([
+            'request_note' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $detail = $this->employeeDetail($employee);
+
+        if ($this->clean($detail?->aadhaarNo) === '' && $this->clean($detail?->panNo) === '') {
+            return response()->json([
+                'message' => 'Save your Aadhaar or PAN number once in your profile before requesting edit access.',
+            ], 422);
+        }
+
+        $latestRequest = $this->latestIdentityDetailRequest($employee);
+        $latestRequestStatus = strtolower($this->clean($latestRequest?->status));
+
+        if ($latestRequest && in_array($latestRequestStatus, [
+            EmployeeIdentityDetailRequest::STATUS_PENDING,
+            EmployeeIdentityDetailRequest::STATUS_APPROVED,
+            EmployeeIdentityDetailRequest::STATUS_SUBMITTED,
+        ], true)) {
+            return response()->json([
+                'message' => 'An Aadhaar/PAN edit request is already in progress.',
+            ], 422);
+        }
+
+        $requestRecord = EmployeeIdentityDetailRequest::query()->create([
+            'employee_id' => $employee->id,
+            'emp_id' => $this->clean($employee->empId),
+            'status' => EmployeeIdentityDetailRequest::STATUS_PENDING,
+            'request_note' => trim((string) ($data['request_note'] ?? '')) ?: null,
+        ]);
+
+        return response()->json([
+            'message' => 'Aadhaar/PAN edit request submitted successfully.',
+            'request' => $this->identityDetailRequestPayload($requestRecord),
+        ], 201);
+    }
+
+    public function submitIdentityDetails(Request $request): JsonResponse
+    {
+        $employee = $request->user();
+
+        abort_unless($employee instanceof Employee, 401);
+
+        $requestRecord = $this->latestIdentityDetailRequest($employee);
+        $requestStatus = strtolower($this->clean($requestRecord?->status));
+
+        if (! $requestRecord || $requestStatus !== EmployeeIdentityDetailRequest::STATUS_APPROVED) {
+            return response()->json([
+                'message' => 'Aadhaar and PAN can be edited only after admin approval.',
+            ], 422);
+        }
+
+        $panNumber = strtoupper($this->clean($request->input('pan_number')));
+        $request->merge(['pan_number' => $panNumber !== '' ? $panNumber : null]);
+
+        $data = $request->validate([
+            'aadhaar_number' => ['nullable', 'digits:12'],
+            'pan_number' => ['nullable', 'regex:/^[A-Z]{5}[0-9]{4}[A-Z]$/'],
+            'request_note' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $detail = $this->employeeDetail($employee);
+        $currentAadhaar = $this->clean($detail?->aadhaarNo);
+        $currentPan = strtoupper($this->clean($detail?->panNo));
+        $requestedAadhaar = $this->clean($data['aadhaar_number'] ?? null) ?: $currentAadhaar;
+        $requestedPan = strtoupper($this->clean($data['pan_number'] ?? null)) ?: $currentPan;
+
+        if ($requestedAadhaar === $currentAadhaar && $requestedPan === $currentPan) {
+            return response()->json([
+                'message' => 'Enter a different Aadhaar or PAN number before submitting for verification.',
+            ], 422);
+        }
+
+        $requestRecord->update([
+            'status' => EmployeeIdentityDetailRequest::STATUS_SUBMITTED,
+            'request_note' => trim((string) ($data['request_note'] ?? $requestRecord->request_note)) ?: $requestRecord->request_note,
+            'requested_aadhaar_no' => $requestedAadhaar,
+            'requested_pan_no' => $requestedPan,
+            'submitted_at' => now(),
+        ]);
+
+        return response()->json([
+            'message' => 'Updated Aadhaar/PAN details submitted and are pending verification.',
+            'request' => $this->identityDetailRequestPayload($requestRecord->fresh()),
+        ]);
+    }
+
     public function submitInitialUanNumber(Request $request): JsonResponse
     {
         $employee = $request->user();
@@ -456,7 +550,7 @@ class EmployeeRequestController extends Controller
             ], 422);
         }
 
-        $detail ??= new EmployeeDetail();
+        $detail ??= new EmployeeDetail;
         $now = Carbon::now(config('app.timezone', 'Asia/Kolkata'));
 
         $detail->employeeId = $this->clean($employee->empId);
@@ -740,8 +834,7 @@ class EmployeeRequestController extends Controller
         ?Attendance $attendance,
         ?string $dayOverrideStatus = null,
         ?Employee $employee = null
-    ): string
-    {
+    ): string {
         $dayOverrideStatus = $this->clean($dayOverrideStatus);
 
         if ($this->isAttendanceStatus($dayOverrideStatus)) {
@@ -982,6 +1075,14 @@ class EmployeeRequestController extends Controller
             ->first();
     }
 
+    private function latestIdentityDetailRequest(Employee $employee): ?EmployeeIdentityDetailRequest
+    {
+        return EmployeeIdentityDetailRequest::query()
+            ->where('employee_id', $employee->id)
+            ->latest('id')
+            ->first();
+    }
+
     private function latestAttendanceBranchId(Employee $employee): string
     {
         $attendance = Attendance::query()
@@ -1010,6 +1111,18 @@ class EmployeeRequestController extends Controller
             'uanNumber' => $this->clean($requestRecord->requested_uan_number),
             'passbookDocUrl' => $this->resolvePhotoUrl($requestRecord->requested_passbook_doc),
             'submittedAt' => $requestRecord->submitted_at?->toIso8601String(),
+        ];
+    }
+
+    private function identityDetailRequestPayload(EmployeeIdentityDetailRequest $requestRecord): array
+    {
+        return [
+            'id' => $requestRecord->id,
+            'status' => $this->clean($requestRecord->status),
+            'requestNote' => $this->clean($requestRecord->request_note),
+            'adminNote' => $this->clean($requestRecord->admin_note),
+            'pendingAadhaarNumber' => $this->clean($requestRecord->requested_aadhaar_no),
+            'pendingPanNumber' => $this->clean($requestRecord->requested_pan_no),
         ];
     }
 

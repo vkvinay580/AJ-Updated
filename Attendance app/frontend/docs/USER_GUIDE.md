@@ -2,7 +2,7 @@
 
 Open `http://127.0.0.1:8000/` for the Aryan Gold employee web application and `http://127.0.0.1:8000/admin/login` for administrator sign-in.
 
-Use an existing authorized account from the imported backup or the local accounts supplied in chat. The local database is separate from existing XAMPP databases. The current Android and web release is version 5.0.43 (5044). Both are branded for Aryan Gold. The full upstream user guide is retained in `UPSTREAM_USER_GUIDE.md`.
+Use an existing authorized account from the imported backup or the local accounts supplied in chat. The local database is separate from existing XAMPP databases. The current Android and web release is version 5.0.44 (5045). Both are branded for Aryan Gold. The full upstream user guide is retained in `UPSTREAM_USER_GUIDE.md`.
 
 The production app connects to `https://attendance.aryangold.in/api` by default. Local employee web and Android builds connect to the local API only when the developer builds them with the documented `API_BASE_URL` override. Release Android builds reject cleartext HTTP; debug builds retain HTTP support for local development.
 
@@ -14,7 +14,7 @@ The employee web sign-in screen fills the available browser height while keeping
 
 Attendance forms now use consistent high-contrast fields, focus borders, and full-height action buttons. On the My Attendance page, the employee name, branch name, employee ID, and branch ID are shown on separate aligned lines so long names remain readable. Desktop web dashboards can be scrolled normally and display a standard scrollbar when content extends below the window.
 
-Version 5.0.43 (5044) is available from the Attendance download link on the Aryan Gold staff login page as Android package `aryan.attendance`. It retains Firebase notifications and the full-viewport launch experience while using the Aryan teal-green treatment for notification backgrounds and accents. The direct-download APK uses the same signing certificate as version 5.0.37, so it can update that directly distributed build in place.
+Version 5.0.44 (5045) is available from the Attendance download link on the Aryan Gold staff login page as Android package `aryan.attendance`. It locks saved Aadhaar and PAN numbers and adds the approved correction workflow while retaining Firebase notifications and the full-viewport launch experience. The direct-download APK uses the same signing certificate as version 5.0.37, so it can update that directly distributed build in place.
 
 ## Firebase attendance notifications
 
@@ -46,6 +46,8 @@ Approved bank-detail changes can now be submitted from the app without a server 
 
 Administrators can verify submitted bank-detail changes individually or in bulk even when the employee does not yet have a payroll-detail row or optional Aadhaar, PAN, or UAN values. Verification creates the required payroll record and keeps supplied financial identifiers encrypted.
 
+An employee may save a missing Aadhaar or PAN number once from **My Profile**. After a number is saved, the field is locked in both the app and the API. To correct it, select **Request Edit Access**, provide a reason, and wait for an Accounts or HR administrator to approve the request. After approval, use **Edit Aadhaar / PAN** to submit the proposed correction. The existing verified values remain unchanged until the administrator reviews and verifies the submission under **Detail Edit Requests > Aadhaar / PAN Requests**. Rejected requests can be submitted again with a new reason.
+
 After verification, bank-detail requests appear in the **Approved / Verified** tab. The page shows separate totals for requests waiting for employee submission and requests that are fully verified. Completed verified rows are retained for review and cannot be selected for rejection.
 
 Attendance administrators can use the eye button beside each field on **Admin > Change Password** to show or hide the old password, new password, and confirmation password independently. Passwords remain hidden when the page first opens.
@@ -76,6 +78,7 @@ Branch-portal sign-in now explains the exact corrective action: an employee with
 
 ## Documentation change log
 
+- 2026-11-02: Locked saved Aadhaar and PAN numbers, added approval plus verification for corrections, and released forced-update Android/web version 5.0.44 (5045).
 - 2026-11-02: Clarified in generated offer letters that permanent employment and company-policy PF/ESI eligibility are subject to satisfactory probation and written confirmation, and that probationary employment may be discontinued for unsatisfactory performance or terminated immediately for misconduct or serious issues, subject to applicable law.
 - 2026-10-28: Added protected deletion for unused connected branches and a clear conflict response when employees are still assigned.
 - 2026-10-28: Fixed new branch creation with long Google Maps and Street View URLs by expanding the stored branch URL, address, and timings fields to match the connected API limits.
