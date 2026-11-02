@@ -78,6 +78,7 @@ Branch-portal sign-in now explains the exact corrective action: an employee with
 
 ## Documentation change log
 
+- 2026-11-02: Fixed the server error that occurred when submitting approved Aadhaar/PAN corrections with replacement card images on production.
 - 2026-11-02: Moved bank and Aadhaar/PAN profile approvals to **Employee > Edit Request Access** in the Laravel administrator sidebar.
 - 2026-11-02: Added private Aadhaar/PAN card-image upload, secure employee viewing, approved replacement plus administrator verification, and forced-update Android/web version 5.0.45 (5046).
 - 2026-11-02: Locked saved Aadhaar and PAN numbers, added approval plus verification for corrections, and released forced-update Android/web version 5.0.44 (5045).

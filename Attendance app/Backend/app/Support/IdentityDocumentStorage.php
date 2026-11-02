@@ -5,12 +5,12 @@ namespace App\Support;
 use App\Models\Employee;
 use App\Rules\DecodableImage;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\File;
 use Intervention\Image\Laravel\Facades\Image;
 
 final class IdentityDocumentStorage
 {
-    private const DISK = 'local';
+    private const DIRECTORY = 'private/employee-identity-documents/';
 
     public static function store(
         UploadedFile $image,
@@ -22,7 +22,7 @@ final class IdentityDocumentStorage
         $type = self::normalizedType($type);
         $scope = preg_replace('/[^a-z0-9_-]+/i', '-', $scope) ?: 'document';
         $extension = DecodableImage::extension($image) ?? 'jpg';
-        $directory = 'private/employee-identity-documents/'.$employee->getKey();
+        $directory = self::DIRECTORY.$employee->getKey();
         $filename = sprintf(
             '%s_%s_%s_%s.%s',
             $scope,
@@ -33,10 +33,10 @@ final class IdentityDocumentStorage
         );
         $path = $directory.'/'.$filename;
 
-        Storage::disk(self::DISK)->makeDirectory($directory);
+        File::ensureDirectoryExists(storage_path('app/'.$directory), 0750, true);
         Image::read($image)
             ->scaleDown(width: 2000)
-            ->save(Storage::disk(self::DISK)->path($path));
+            ->save(self::absolutePath($path));
 
         self::delete($existingPath);
 
@@ -46,21 +46,25 @@ final class IdentityDocumentStorage
     public static function delete(?string $path): void
     {
         $path = trim((string) $path);
-        if ($path !== '') {
-            Storage::disk(self::DISK)->delete($path);
+        $absolutePath = self::safeAbsolutePath($path);
+        if ($absolutePath !== null) {
+            File::delete($absolutePath);
         }
     }
 
     public static function exists(?string $path): bool
     {
-        $path = trim((string) $path);
+        $absolutePath = self::safeAbsolutePath(trim((string) $path));
 
-        return $path !== '' && Storage::disk(self::DISK)->exists($path);
+        return $absolutePath !== null && File::exists($absolutePath);
     }
 
     public static function absolutePath(string $path): string
     {
-        return Storage::disk(self::DISK)->path($path);
+        $absolutePath = self::safeAbsolutePath($path);
+        abort_unless($absolutePath !== null, 404);
+
+        return $absolutePath;
     }
 
     public static function normalizedType(string $type): string
@@ -69,5 +73,15 @@ final class IdentityDocumentStorage
         abort_unless(in_array($type, ['aadhaar', 'pan'], true), 404);
 
         return $type;
+    }
+
+    private static function safeAbsolutePath(string $path): ?string
+    {
+        $path = ltrim(str_replace('\\', '/', trim($path)), '/');
+        if (! str_starts_with($path, self::DIRECTORY) || str_contains($path, '..')) {
+            return null;
+        }
+
+        return storage_path('app/'.$path);
     }
 }
