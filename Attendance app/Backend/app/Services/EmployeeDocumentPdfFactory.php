@@ -29,7 +29,7 @@ final class EmployeeDocumentPdfFactory
                     ['Monthly gross salary', $this->money($monthlySalary)],
                     ['Annual gross salary', $this->money($monthlySalary * 12)],
                     ['Probationary period', '3 months from date of joining'],
-                    ['Provident Fund', 'As applicable under payroll rules'],
+                    ['PF and ESI', 'After confirmation; statutory coverage as required by law'],
                     ['Advance / security recovery', 'As applicable to approved records'],
                 ],
                 [250, 237],
@@ -44,7 +44,7 @@ final class EmployeeDocumentPdfFactory
                 [
                     'number' => '1.',
                     'title' => 'Probation',
-                    'body' => 'Your first three months of employment will be a probationary period. Confirmation will depend on satisfactory performance, conduct and written confirmation by the company.',
+                    'body' => 'Your first three months of employment will be a probationary period. You will be confirmed as a permanent employee only if your performance and conduct during probation are satisfactory and the company provides written confirmation. Eligibility for PF and ESI under company policy is subject to confirmation after probation; however, mandatory statutory coverage and contributions will apply from the date required by law. During probation, unsatisfactory performance may result in discontinuation of employment. Misconduct, breach of company policy or any serious employment-related issue may result in termination with immediate effect, subject to applicable law.',
                 ],
                 [
                     'number' => '2.',

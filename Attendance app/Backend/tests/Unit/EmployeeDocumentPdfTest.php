@@ -86,6 +86,11 @@ class EmployeeDocumentPdfTest extends TestCase
         $this->assertStringContainsString('/Count 2', $pdf);
         $this->assertStringContainsString('Probationary period', $pdf);
         $this->assertStringContainsString('3 months from date of joining', $pdf);
+        $this->assertStringContainsString('PF and ESI', $pdf);
+        $this->assertStringContainsString('After confirmation; statutory coverage as required by law', $pdf);
+        $this->assertStringContainsString('statutory coverage and contributions', $pdf);
+        $this->assertStringContainsString('confirmed as a permanent employee only if your performance', $pdf);
+        $this->assertStringContainsString('termination with immediate effect', $pdf);
         $this->assertStringContainsString('Terms and Conditions', $pdf);
         $this->assertStringContainsString('CODE OF CONDUCT', $pdf);
         $this->assertStringContainsString('Confidentiality and work product', $pdf);
