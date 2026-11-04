@@ -9,7 +9,15 @@ import {
 } from "@/lib/api";
 import { removeCustomerFile, storeCustomerFile } from "@/lib/customer-files";
 import { removeVerificationPhoto } from "@/lib/verification-files";
-import { execute, one, rows, transaction } from "@/lib/db";
+import {
+  decryptSensitive,
+  encryptSensitive,
+  execute,
+  one,
+  rows,
+  stableHash,
+  transaction,
+} from "@/lib/db";
 
 export async function GET(
   request: NextRequest,
@@ -31,12 +39,32 @@ export async function GET(
     [id, session.companyId],
   );
   if (!customer) return apiError("Customer not found.", 404);
-  const kyc = await rows<RowDataPacket>(
-    `SELECT id, document_type AS documentType, number_last4 AS last4,
-    document_path IS NOT NULL AS hasDocument, verified, created_at AS createdAt
+  const includeKycNumbers = request.nextUrl.searchParams.get("edit") === "1";
+  const kycRows = await rows<RowDataPacket>(
+    `SELECT id, document_type AS documentType, number_encrypted AS numberEncrypted,
+    number_last4 AS last4, document_path IS NOT NULL AS hasDocument, verified, created_at AS createdAt
     FROM kyc_records WHERE customer_id = ? AND company_id = ? ORDER BY document_type`,
     [id, session.companyId],
   );
+  const kyc = kycRows.map((record) => {
+    let number: string | undefined;
+    if (includeKycNumbers) {
+      try {
+        number = decryptSensitive(String(record.numberEncrypted));
+      } catch {
+        number = undefined;
+      }
+    }
+    return {
+      id: record.id,
+      documentType: record.documentType,
+      last4: record.last4,
+      hasDocument: record.hasDocument,
+      verified: record.verified,
+      createdAt: record.createdAt,
+      number,
+    };
+  });
   const bills = await rows<RowDataPacket>(
     `SELECT id, bill_number AS billNumber, transaction_type AS transactionType,
     DATE_FORMAT(bill_date, '%Y-%m-%d') AS billDate, total_paise AS totalPaise FROM bills WHERE customer_id = ? AND company_id = ? ORDER BY id DESC LIMIT 25`,
@@ -79,16 +107,19 @@ export async function GET(
     JOIN customer_verification_requests r ON r.id=v.request_id WHERE r.customer_id=? AND r.company_id=? ORDER BY v.id`,
     [id, session.companyId],
   );
-  return NextResponse.json({
-    customer,
-    kyc,
-    bills,
-    verifications,
-    verificationPhotos,
-    verificationVideos,
-    verificationReferences,
-    signatureBillId: signatureBill?.id || null,
-  });
+  return NextResponse.json(
+    {
+      customer,
+      kyc,
+      bills,
+      verifications,
+      verificationPhotos,
+      verificationVideos,
+      verificationReferences,
+      signatureBillId: signatureBill?.id || null,
+    },
+    { headers: { "Cache-Control": "private, no-store" } },
+  );
 }
 
 export async function PATCH(
@@ -110,6 +141,8 @@ export async function PATCH(
   const stateCode = cleanText(form.get("stateCode"), 2);
   const placeOfSupply = cleanText(form.get("placeOfSupply"), 80);
   const postalCode = cleanText(form.get("postalCode"), 10);
+  const aadhaar = String(form.get("aadhaar") || "").replace(/\D/g, "");
+  const pan = String(form.get("pan") || "").trim().toUpperCase();
   const employerName = cleanText(form.get("employerName"), 190);
   const employerAddress = cleanText(form.get("employerAddress"), 500);
   const employmentDesignation = cleanText(
@@ -124,6 +157,10 @@ export async function PATCH(
     return apiError("Enter a valid 10-digit phone number.");
   if (name.length < 2) return apiError("Customer name is required.");
   if (!/^\d{6}$/.test(postalCode)) return apiError("Postal code must contain exactly 6 digits.");
+  if (aadhaar && !/^\d{12}$/.test(aadhaar))
+    return apiError("Aadhaar number must contain exactly 12 digits.");
+  if (pan && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan))
+    return apiError("Enter a valid PAN number.");
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
     return apiError("Enter a valid email address.");
   if (gstin && !/^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]$/.test(gstin))
@@ -143,6 +180,19 @@ export async function PATCH(
     [id, session.companyId],
   );
   if (!customer) return apiError("Customer not found.", 404);
+  const existingKyc = await rows<
+    RowDataPacket & {
+      id: number;
+      documentType: "aadhaar" | "pan";
+      numberHash: string;
+      documentPath: string | null;
+    }
+  >(
+    `SELECT id, document_type AS documentType, number_hash AS numberHash,
+    document_path AS documentPath FROM kyc_records
+    WHERE customer_id = ? AND company_id = ?`,
+    [id, session.companyId],
+  );
   const duplicate = await one<RowDataPacket>(
     "SELECT id FROM customers WHERE company_id = ? AND phone = ? AND id <> ?",
     [session.companyId, phone, id],
@@ -154,11 +204,29 @@ export async function PATCH(
     );
   const companyIdCard = form.get("companyIdCard");
   const oldGoldWearingImage = form.get("oldGoldWearingImage");
+  const aadhaarFile = form.get("aadhaarFile");
+  const panFile = form.get("panFile");
+  const currentAadhaar = existingKyc.find(
+    (record) => record.documentType === "aadhaar",
+  );
+  const currentPan = existingKyc.find((record) => record.documentType === "pan");
+  const aadhaarNumberChanged = Boolean(
+    aadhaar && currentAadhaar && stableHash(aadhaar) !== currentAadhaar.numberHash,
+  );
+  const panNumberChanged = Boolean(
+    pan && currentPan && stableHash(pan) !== currentPan.numberHash,
+  );
+  if (!currentAadhaar && !aadhaar && aadhaarFile instanceof File && aadhaarFile.size)
+    return apiError("Enter an Aadhaar number before adding its document.");
+  if (!currentPan && !pan && panFile instanceof File && panFile.size)
+    return apiError("Enter a PAN number before adding its document.");
   let storedCompanyId: Awaited<ReturnType<typeof storeCustomerFile>> | null =
     null;
   let storedOldGoldWearingImage: Awaited<
     ReturnType<typeof storeCustomerFile>
   > | null = null;
+  let storedAadhaar: Awaited<ReturnType<typeof storeCustomerFile>> | null = null;
+  let storedPan: Awaited<ReturnType<typeof storeCustomerFile>> | null = null;
   try {
     storedCompanyId =
       companyIdCard instanceof File && companyIdCard.size
@@ -167,6 +235,14 @@ export async function PATCH(
     storedOldGoldWearingImage =
       oldGoldWearingImage instanceof File && oldGoldWearingImage.size
         ? await storeCustomerFile(oldGoldWearingImage, session.companyId, false)
+        : null;
+    storedAadhaar =
+      aadhaarFile instanceof File && aadhaarFile.size
+        ? await storeCustomerFile(aadhaarFile, session.companyId)
+        : null;
+    storedPan =
+      panFile instanceof File && panFile.size
+        ? await storeCustomerFile(panFile, session.companyId)
         : null;
     await transaction(async (connection) => {
       await execute(
@@ -210,6 +286,89 @@ export async function PATCH(
         ],
         connection,
       );
+      const kycUpdates = [
+        {
+          documentType: "aadhaar" as const,
+          number: aadhaar,
+          numberChanged: aadhaarNumberChanged,
+          existing: currentAadhaar,
+          stored: storedAadhaar,
+          file: aadhaarFile,
+        },
+        {
+          documentType: "pan" as const,
+          number: pan,
+          numberChanged: panNumberChanged,
+          existing: currentPan,
+          stored: storedPan,
+          file: panFile,
+        },
+      ];
+      for (const kycUpdate of kycUpdates) {
+        if (kycUpdate.existing) {
+          if (!kycUpdate.numberChanged && !kycUpdate.stored) continue;
+          if (kycUpdate.numberChanged) {
+            await execute(
+              `UPDATE kyc_records SET number_encrypted = ?, number_hash = ?, number_last4 = ?,
+              document_path = ?, original_name = ?, mime_type = ?, verified = 0
+              WHERE id = ? AND customer_id = ? AND company_id = ?`,
+              [
+                encryptSensitive(kycUpdate.number),
+                stableHash(kycUpdate.number),
+                kycUpdate.number.slice(-4),
+                kycUpdate.stored?.path || null,
+                kycUpdate.stored && kycUpdate.file instanceof File
+                  ? cleanText(kycUpdate.file.name, 255)
+                  : null,
+                kycUpdate.stored?.mime || null,
+                kycUpdate.existing.id,
+                id,
+                session.companyId,
+              ],
+              connection,
+            );
+          } else {
+            await execute(
+              `UPDATE kyc_records SET document_path = ?, original_name = ?, mime_type = ?, verified = 0
+              WHERE id = ? AND customer_id = ? AND company_id = ?`,
+              [
+                kycUpdate.stored?.path || null,
+                kycUpdate.file instanceof File
+                  ? cleanText(kycUpdate.file.name, 255)
+                  : null,
+                kycUpdate.stored?.mime || null,
+                kycUpdate.existing.id,
+                id,
+                session.companyId,
+              ],
+              connection,
+            );
+          }
+          continue;
+        }
+        if (!kycUpdate.number) continue;
+        await execute(
+          `INSERT INTO kyc_records
+          (customer_id, company_id, document_type, number_encrypted, number_hash, number_last4,
+          document_path, original_name, mime_type, created_by)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            id,
+            session.companyId,
+            kycUpdate.documentType,
+            encryptSensitive(kycUpdate.number),
+            stableHash(kycUpdate.number),
+            kycUpdate.number.slice(-4),
+            kycUpdate.stored?.path || null,
+            kycUpdate.stored && kycUpdate.file instanceof File
+              ? cleanText(kycUpdate.file.name, 255)
+              : null,
+            kycUpdate.stored?.mime || null,
+            session.adminId,
+          ],
+          connection,
+        );
+      }
       await execute(
         "INSERT INTO audit_logs (admin_id, company_id, action, entity_type, entity_id, ip_address) VALUES (?, ?, 'customer_updated', 'customer', ?, ?)",
         [session.adminId, session.companyId, id, requestIp(request)],
@@ -219,14 +378,26 @@ export async function PATCH(
   } catch (caught) {
     removeCustomerFile(storedCompanyId?.path);
     removeCustomerFile(storedOldGoldWearingImage?.path);
+    removeCustomerFile(storedAadhaar?.path);
+    removeCustomerFile(storedPan?.path);
+    const message =
+      caught instanceof Error ? caught.message : "Unable to update customer.";
+    if (message.includes("Duplicate entry"))
+      return apiError(
+        "This phone, Aadhaar, or PAN is already registered in this company.",
+        409,
+      );
     return apiError(
-      caught instanceof Error ? caught.message : "Unable to update customer.",
+      message,
       500,
     );
   }
   if (storedCompanyId) removeCustomerFile(customer.companyIdCardPath);
   if (storedOldGoldWearingImage)
     removeCustomerFile(customer.oldGoldWearingImagePath);
+  if (storedAadhaar || aadhaarNumberChanged)
+    removeCustomerFile(currentAadhaar?.documentPath);
+  if (storedPan || panNumberChanged) removeCustomerFile(currentPan?.documentPath);
   return NextResponse.json({ ok: true, customerId: id });
 }
 

@@ -7,6 +7,7 @@ import {
   FileCheck2,
   ImageIcon,
   MapPin,
+  Pencil,
   ReceiptText,
   ShieldCheck,
   Trash2,
@@ -163,6 +164,12 @@ export default function CustomerDetailPage() {
           {error && <p className="form-error">{error}</p>}
         </div>
         <div className="detail-actions">
+          <Link
+            className="admin-secondary"
+            href={`/admin/customers/${c.id}/edit`}
+          >
+            <Pencil /> Edit customer & KYC
+          </Link>
           <button
             className="admin-danger"
             disabled={deleting}
