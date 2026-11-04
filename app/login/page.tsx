@@ -1,6 +1,7 @@
 import {
   ArrowRight,
   Building2,
+  CalendarCheck2,
   Download,
   Landmark,
   LayoutDashboard,
@@ -57,6 +58,15 @@ const portals = [
     action: "Open Admin login",
     icon: LayoutDashboard,
     tone: "admin",
+  },
+  {
+    href: "https://attendance.aryangold.in/admin/login",
+    title: "Attendance Admin",
+    audience: "Attendance administrators",
+    description: "Manage employees, attendance, leave, payroll, reports, and attendance settings.",
+    action: "Open Attendance Admin login",
+    icon: CalendarCheck2,
+    tone: "attendance",
   },
 ] as const;
 
