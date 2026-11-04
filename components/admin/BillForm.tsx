@@ -38,7 +38,7 @@ export default function BillForm({ portal = "admin", fixedRates, availableFundPa
   const initial = params.get("customerId");
   const verificationRequestedAtCreation = params.get("verificationRequested") === "1";
   const pledgeId = isBranch ? params.get("pledgeId") : null;
-  const initialTransactionType: GoldTransactionType = isBranch ? "purchase" : "sale";
+  const initialTransactionType: GoldTransactionType = "purchase";
   const fixedRate = (nextType: GoldTransactionType, purity: unknown) => goldRateFor(fixedRates, nextType, purity) / 100;
   const newItem = (nextType: GoldTransactionType) => ({ ...blank(), ratePerGram: fixedRates ? String(fixedRate(nextType, "999")) : "" });
   const [customer, setCustomer] = useState<Customer | null>(null);
