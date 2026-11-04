@@ -42,6 +42,15 @@ async function markWaitingCustomers(connection:PoolConnection, customers:Waiting
     [Number(customer.companyId),Number(customer.id),branchId,date,source,employeeId], connection);
 }
 
+async function nextInternalTransferNumber(connection:PoolConnection, branchId:string, transferDate:string) {
+  await execute(`INSERT INTO internal_stock_transfer_sequences (branch_id,transfer_date,last_number)
+    VALUES (?,?,LAST_INSERT_ID(1)) ON DUPLICATE KEY UPDATE last_number=LAST_INSERT_ID(last_number+1)`, [branchId,transferDate], connection);
+  const sequence = await one<RowDataPacket>("SELECT LAST_INSERT_ID() AS value", [], connection);
+  const [,month,day] = transferDate.split("-");
+  const safeBranchId = branchId.toUpperCase().replace(/[^A-Z0-9-]/g, "");
+  return `ITR/${day}${month}/${safeBranchId}/${String(Number(sequence?.value || 1)).padStart(2,"0")}`;
+}
+
 async function authorized(request: NextRequest) {
   if (!sameOrigin(request)) return { session: null, error: apiError("Invalid request origin.", 403) };
   const session = await getBranchSession();
@@ -85,7 +94,8 @@ export async function GET(request: NextRequest) {
       FROM branch_fund_ledger WHERE branch_id=? ORDER BY id DESC LIMIT 150`, [branchId]),
     rows<RowDataPacket>(`SELECT id,direction,weight_mg AS weightMg,entry_type AS entryType,description,created_at AS createdAt
       FROM branch_stock_ledger WHERE branch_id=? ORDER BY id DESC LIMIT 150`, [branchId]),
-    rows<RowDataPacket>(`SELECT gt.id,gt.weight_mg AS weightMg,gt.tare_weight_mg AS tareWeightMg,gt.bm_name AS bmName,gt.bm_phone AS bmPhone,gt.notes,gt.status,gt.admin_notes AS adminNotes,gt.created_at AS createdAt,
+    rows<RowDataPacket>(`SELECT gt.id,gt.itr_number AS itrNumber,gt.weight_mg AS weightMg,gt.gross_weight_mg AS grossWeightMg,gt.transfer_value_paise AS transferValuePaise,
+      gt.tare_weight_mg AS tareWeightMg,gt.bm_name AS bmName,gt.bm_phone AS bmPhone,gt.notes,gt.status,gt.admin_notes AS adminNotes,gt.created_at AS createdAt,
       COUNT(ti.id) AS itemCount,COUNT(DISTINCT ti.transaction_id) AS packetCount,COUNT(DISTINCT ti.bill_id) AS billCount FROM branch_gold_transfers gt
       LEFT JOIN branch_gold_transfer_items ti ON ti.transfer_id=gt.id WHERE gt.branch_id=? GROUP BY gt.id ORDER BY gt.id DESC LIMIT 100`, [branchId]),
     rows<RowDataPacket>(`SELECT bi.id AS billItemId,t.id AS transactionId,b.id AS billId,b.bill_number AS billNumber,
@@ -153,18 +163,40 @@ export async function POST(request: NextRequest) {
     const tareWeightMg = milligrams(value(body, "tareWeightGrams") || 0);
     const bmName = cleanText(value(body, "bmName"), 190);
     const bmPhone = cleanPhone(value(body, "bmPhone"));
+    const generateReport = value(body, "generateReport") === true || value(body, "generateReport") === "1";
+    const report = {
+      state: cleanText(value(body, "state"), 100),
+      stateCode: cleanText(value(body, "stateCode"), 2),
+      placeOfSupply: cleanText(value(body, "placeOfSupply"), 100),
+      transporterName: cleanText(value(body, "transporterName"), 190),
+      transporterGstin: cleanText(value(body, "transporterGstin"), 20).toUpperCase(),
+      transportationMode: cleanText(value(body, "transportationMode"), 20).toUpperCase(),
+      shipper: cleanText(value(body, "shipper"), 2000),
+      consignee: cleanText(value(body, "consignee"), 2000),
+      purposeOfMovement: cleanText(value(body, "purposeOfMovement"), 190),
+      shippingAddress: cleanText(value(body, "shippingAddress"), 2000),
+    };
     if (!packetIds.length) return apiError("Select at least one billed packet.");
     if (!nonNegative(tareWeightMg)) return apiError("Enter a valid tare weight.");
     if ((bmName && bmPhone.length !== 10) || (!bmName && bmPhone)) return apiError("Enter both the BM name and a valid 10-digit BM phone number.");
+    if (generateReport && (!report.state || !report.placeOfSupply || !report.transporterName || !["BY ROAD","BY AIR"].includes(report.transportationMode)
+      || !report.shipper || !report.consignee || !report.purposeOfMovement || !report.shippingAddress)) {
+      return apiError("Complete all required Internal Stock Transfer report details.");
+    }
+    if (generateReport && report.stateCode && !/^\d{2}$/.test(report.stateCode)) return apiError("Enter a valid two-digit state code.");
+    if (generateReport && report.transporterGstin && !/^\d{2}[A-Z0-9]{13}$/.test(report.transporterGstin)) return apiError("Enter a valid transporter GSTIN or leave it blank.");
     const reportDate = indiaDate();
     const confirmWaitingCustomers = value(body, "markWaitingNotBilled") === true || value(body, "markWaitingNotBilled") === "1";
     const currentWaitingCustomers = await waitingCustomers(branchId, reportDate);
     if (currentWaitingCustomers.length && !confirmWaitingCustomers) return waitingCustomerResponse(currentWaitingCustomers);
+    let createdTransferId = 0;
+    let itrNumber = "";
     try {
       await transaction(async (connection) => {
         if (confirmWaitingCustomers) await markWaitingCustomers(connection, await waitingCustomers(branchId, reportDate, connection), branchId, reportDate, "send_report", employeeId);
         const placeholders = packetIds.map(() => "?").join(",");
-        const selected = await rows<RowDataPacket>(`SELECT bi.id AS billItemId,bi.weight_mg AS weightMg,b.id AS billId,t.id AS transactionId
+        const selected = await rows<RowDataPacket>(`SELECT bi.id AS billItemId,bi.weight_mg AS weightMg,bi.gross_weight_mg AS grossWeightMg,
+          bi.amount_paise AS amountPaise,b.id AS billId,t.id AS transactionId
           FROM branch_transactions t JOIN bills b ON b.id=t.bill_id JOIN bill_items bi ON bi.bill_id=b.id
           LEFT JOIN branch_gold_transfer_items ti ON ti.bill_item_id=bi.id
           WHERE t.id IN (${placeholders}) AND t.branch_id=? AND t.transaction_type='purchase' AND t.status='billed'
@@ -172,9 +204,21 @@ export async function POST(request: NextRequest) {
         const selectedPackets = new Set(selected.map(item => Number(item.transactionId)));
         if (!selected.length || selectedPackets.size !== packetIds.length) throw new Error("ITEM_UNAVAILABLE");
         const weightMg = selected.reduce((sum, item) => sum + Number(item.weightMg), 0);
+        const grossWeightMg = selected.reduce((sum, item) => sum + Number(item.grossWeightMg || item.weightMg), 0);
+        const transferValuePaise = selected.reduce((sum, item) => sum + Number(item.amountPaise), 0);
         if (await lockStockLedger(branchId, connection) < weightMg) throw new Error("INSUFFICIENT_STOCK");
-        const created = await execute("INSERT INTO branch_gold_transfers (branch_id,weight_mg,tare_weight_mg,bm_name,bm_phone,notes,created_by_employee_id) VALUES (?,?,?,?,?,?,?)",
-          [branchId, weightMg, tareWeightMg, bmName || null, bmPhone || null, cleanText(value(body, "notes"), 500) || null, employeeId], connection);
+        if (generateReport) itrNumber = await nextInternalTransferNumber(connection, branchId, reportDate);
+        const created = await execute(`INSERT INTO branch_gold_transfers
+          (branch_id,weight_mg,gross_weight_mg,transfer_value_paise,tare_weight_mg,bm_name,bm_phone,itr_number,itr_date,origin_state,
+           origin_state_code,place_of_supply,transporter_name,transporter_gstin,transportation_mode,shipper_details,consignee_details,
+           purpose_of_movement,shipping_address,notes,created_by_employee_id)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          [branchId,weightMg,grossWeightMg,transferValuePaise,tareWeightMg,bmName||null,bmPhone||null,itrNumber||null,generateReport?reportDate:null,
+           generateReport?report.state:null,generateReport&&report.stateCode?report.stateCode:null,generateReport?report.placeOfSupply:null,
+           generateReport?report.transporterName:null,generateReport&&report.transporterGstin?report.transporterGstin:null,
+           generateReport?report.transportationMode:null,generateReport?report.shipper:null,generateReport?report.consignee:null,
+           generateReport?report.purposeOfMovement:null,generateReport?report.shippingAddress:null,cleanText(value(body,"notes"),500)||null,employeeId], connection);
+        createdTransferId = Number(created.insertId);
         for (const item of selected) await execute(`INSERT INTO branch_gold_transfer_items
           (transfer_id,transaction_id,bill_id,bill_item_id,sent_weight_mg) VALUES (?,?,?,?,?)`,
           [created.insertId, Number(item.transactionId), Number(item.billId), Number(item.billItemId), Number(item.weightMg)], connection);
@@ -186,7 +230,9 @@ export async function POST(request: NextRequest) {
       if (String(error).includes("ITEM_UNAVAILABLE") || String(error).includes("uq_gold_transfer_bill_item")) return apiError("One or more ornaments were already sent or are no longer available.", 409);
       throw error;
     }
-    return NextResponse.json({ ok: true, message: `${packetIds.length} packet${packetIds.length === 1 ? "" : "s"} sent to Head Office with tare weight recorded.` });
+    return NextResponse.json({ ok: true, transferId:createdTransferId, itrNumber:itrNumber||null,
+      reportUrl:itrNumber?`/api/branch/gold-transfers/${createdTransferId}/report`:null,
+      message: `${packetIds.length} packet${packetIds.length === 1 ? "" : "s"} sent to Head Office${itrNumber?` and ${itrNumber} generated`:""}.` });
   }
 
   if (action === "transit") {

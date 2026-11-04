@@ -640,9 +640,23 @@ CREATE TABLE IF NOT EXISTS branch_gold_transfers (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   branch_id VARCHAR(100) NOT NULL,
   weight_mg BIGINT UNSIGNED NOT NULL,
+  gross_weight_mg BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  transfer_value_paise BIGINT UNSIGNED NOT NULL DEFAULT 0,
   tare_weight_mg BIGINT UNSIGNED NOT NULL DEFAULT 0,
   bm_name VARCHAR(190) NULL,
   bm_phone VARCHAR(20) NULL,
+  itr_number VARCHAR(100) NULL,
+  itr_date DATE NULL,
+  origin_state VARCHAR(100) NULL,
+  origin_state_code CHAR(2) NULL,
+  place_of_supply VARCHAR(100) NULL,
+  transporter_name VARCHAR(190) NULL,
+  transporter_gstin VARCHAR(20) NULL,
+  transportation_mode VARCHAR(20) NULL,
+  shipper_details TEXT NULL,
+  consignee_details TEXT NULL,
+  purpose_of_movement VARCHAR(190) NULL,
+  shipping_address TEXT NULL,
   notes VARCHAR(500) NULL,
   status ENUM('submitted','received','rejected') NOT NULL DEFAULT 'submitted',
   created_by_employee_id VARCHAR(100) NOT NULL,
@@ -651,9 +665,16 @@ CREATE TABLE IF NOT EXISTS branch_gold_transfers (
   admin_notes VARCHAR(500) NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id), KEY idx_branch_gold_transfer_review (status, created_at),
+  PRIMARY KEY (id), UNIQUE KEY uq_branch_gold_transfer_itr (itr_number), KEY idx_branch_gold_transfer_review (status, created_at),
   KEY idx_branch_gold_transfer_branch (branch_id, created_at),
   CONSTRAINT fk_branch_gold_transfer_admin FOREIGN KEY (reviewed_by) REFERENCES admins(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS internal_stock_transfer_sequences (
+  branch_id VARCHAR(100) NOT NULL,
+  transfer_date DATE NOT NULL,
+  last_number INT UNSIGNED NOT NULL DEFAULT 0,
+  PRIMARY KEY (branch_id, transfer_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS branch_gold_transfer_items (

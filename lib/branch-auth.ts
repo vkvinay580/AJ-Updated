@@ -14,6 +14,9 @@ export type BranchSession = {
   branchId: string;
   branchName: string;
   branchState: string;
+  branchAddress: string;
+  branchCity: string;
+  branchPincode: string;
   employeeId: string;
   employeeName: string;
 };
@@ -22,7 +25,7 @@ type BranchSessionRow = BranchSession & RowDataPacket;
 const digest = (token: string) => createHash("sha256").update(token).digest("hex");
 
 export async function createBranchSession(
-  data: Omit<BranchSession, "sessionId" | "branchState">,
+  data: Omit<BranchSession, "sessionId" | "branchState" | "branchAddress" | "branchCity" | "branchPincode">,
 ) {
   const token = randomBytes(32).toString("base64url");
   const expires = new Date(Date.now() + SESSION_HOURS * 60 * 60 * 1000);
@@ -60,6 +63,9 @@ export async function getBranchSession(): Promise<BranchSession | null> {
     branchId,
     branchName,
     branchState: context.branch.state,
+    branchAddress: context.branch.address,
+    branchCity: context.branch.city,
+    branchPincode: context.branch.pincode,
     employeeId: row.employeeId,
     employeeName: row.employeeName,
   };

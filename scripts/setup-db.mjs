@@ -200,6 +200,35 @@ try {
   if (!existingTransferColumns.some((column) => column.Field === "bm_phone")) {
     await connection.query("ALTER TABLE branch_gold_transfers ADD COLUMN bm_phone VARCHAR(20) NULL AFTER bm_name");
   }
+  const transferReportColumns = [
+    ["gross_weight_mg", "BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER weight_mg"],
+    ["transfer_value_paise", "BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER gross_weight_mg"],
+    ["itr_number", "VARCHAR(100) NULL AFTER bm_phone"],
+    ["itr_date", "DATE NULL AFTER itr_number"],
+    ["origin_state", "VARCHAR(100) NULL AFTER itr_date"],
+    ["origin_state_code", "CHAR(2) NULL AFTER origin_state"],
+    ["place_of_supply", "VARCHAR(100) NULL AFTER origin_state_code"],
+    ["transporter_name", "VARCHAR(190) NULL AFTER place_of_supply"],
+    ["transporter_gstin", "VARCHAR(20) NULL AFTER transporter_name"],
+    ["transportation_mode", "VARCHAR(20) NULL AFTER transporter_gstin"],
+    ["shipper_details", "TEXT NULL AFTER transportation_mode"],
+    ["consignee_details", "TEXT NULL AFTER shipper_details"],
+    ["purpose_of_movement", "VARCHAR(190) NULL AFTER consignee_details"],
+    ["shipping_address", "TEXT NULL AFTER purpose_of_movement"],
+  ];
+  for (const [name, definition] of transferReportColumns) {
+    if (!existingTransferColumns.some((column) => column.Field === name)) {
+      await connection.query(`ALTER TABLE branch_gold_transfers ADD COLUMN ${name} ${definition}`);
+    }
+  }
+  const [transferReportIndexes] = await connection.query("SHOW INDEX FROM branch_gold_transfers WHERE Key_name='uq_branch_gold_transfer_itr'");
+  if (!transferReportIndexes.length) await connection.query("ALTER TABLE branch_gold_transfers ADD UNIQUE KEY uq_branch_gold_transfer_itr (itr_number)");
+  await connection.query(`CREATE TABLE IF NOT EXISTS internal_stock_transfer_sequences (
+    branch_id VARCHAR(100) NOT NULL,
+    transfer_date DATE NOT NULL,
+    last_number INT UNSIGNED NOT NULL DEFAULT 0,
+    PRIMARY KEY (branch_id, transfer_date)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
 
   const companies = [
     ["aryan-gold", "Aryan Gold", "AG", "/brands/aryan-gold.webp", "AG"],
