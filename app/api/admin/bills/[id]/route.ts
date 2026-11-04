@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { RowDataPacket } from "mysql2";
 import { apiError, authenticated, requestIp } from "@/lib/api";
 import { execute, one, rows, transaction } from "@/lib/db";
-import { getCompanyInvoiceProfile, getCompanySeal } from "@/lib/company-invoice";
+import { getBillInvoiceIssuer, getCompanySeal } from "@/lib/company-invoice";
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { error, session } = await authenticated(request);
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     DATE_FORMAT(b.bill_date, '%Y-%m-%d') AS billDate, b.subtotal_paise AS subtotalPaise, b.tax_paise AS taxPaise,
     b.cgst_paise AS cgstPaise, b.sgst_paise AS sgstPaise, b.cgst_rate_bps AS cgstRateBps, b.sgst_rate_bps AS sgstRateBps,
     b.adjustment_paise AS adjustmentPaise, b.total_paise AS totalPaise, b.release_place AS releasePlace,
-    b.release_amount_paise AS releaseAmountPaise, b.payment_method AS paymentMethod,
+    b.release_amount_paise AS releaseAmountPaise, b.payment_method AS paymentMethod, b.origin_branch_id AS originBranchId,
     b.notes, b.ornament_image_path AS ornamentImagePaths, b.signature_image_path IS NOT NULL AS hasSignatureImage, b.created_at AS createdAt, c.id AS customerId, c.name AS customerName, c.phone AS customerPhone,
     c.email AS customerEmail, c.address AS customerAddress, c.city AS customerCity, c.state AS customerState,
     c.gstin AS customerGstin, c.state_code AS customerStateCode, c.place_of_supply AS placeOfSupply,
@@ -22,6 +22,9 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     FROM bills b JOIN customers c ON c.id = b.customer_id AND c.company_id = b.company_id
     WHERE b.id = ? AND b.company_id = ?`, [id, session.companyId]);
   if (!bill) return apiError("Bill not found.", 404);
+  let issuer;
+  try { issuer = await getBillInvoiceIssuer(session.companySlug, session.companyName, bill.originBranchId ? String(bill.originBranchId) : null); }
+  catch (caught) { return apiError(caught instanceof Error ? caught.message : "Unable to load the invoice address.", 502); }
   if (bill.transactionType === "purchase") {
     bill.taxPaise = 0; bill.cgstPaise = 0; bill.sgstPaise = 0; bill.cgstRateBps = 0; bill.sgstRateBps = 0;
     bill.totalPaise = Number(bill.subtotalPaise) + Number(bill.adjustmentPaise);
@@ -41,7 +44,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     const totalRateBps = Number(bill.subtotalPaise) ? Math.round(Number(bill.taxPaise) * 10000 / Number(bill.subtotalPaise)) : 0;
     bill.cgstRateBps = Math.floor(totalRateBps / 2); bill.sgstRateBps = totalRateBps - Number(bill.cgstRateBps);
   }
-  return NextResponse.json({ bill, items, payments, company: { name: session.companyName, shortName: session.companyShortName, logo: session.companyLogo, seal: getCompanySeal(session.companySlug), ...getCompanyInvoiceProfile(session.companySlug) } });
+  return NextResponse.json({ bill, items, payments, company: { ...issuer, shortName: session.companyShortName, logo: session.companyLogo, seal: getCompanySeal(session.companySlug) } });
 }
 
 export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {

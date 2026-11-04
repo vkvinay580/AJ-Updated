@@ -1,3 +1,6 @@
+import "server-only";
+import { getAttendanceBranches } from "@/lib/attendance";
+
 export type CompanyInvoiceProfile = {
   gstin: string;
   pan?: string;
@@ -10,7 +13,7 @@ export type CompanyInvoiceProfile = {
 const aryanProfile: CompanyInvoiceProfile = {
   gstin: "29ABGCA9333E1ZK",
   pan: "ABGCA9333E",
-  address: "1st Floor, Shop No. 5, No. 126, Laxmi Golden Mall, Sri Dharmaraya Swamy Temple Main Road, behind Shree Kalamma Temple, Nagartapete, Bengaluru, Bengaluru Urban, Karnataka - 560002",
+  address: "No 15, 1st Floor, Siddhi, Nilaya, 4th Cross, Jalahalli, Bangalore North, Bangalore- 560013, Karnataka",
   state: "Karnataka",
   stateCode: "29",
   phone: "+91 90354 22321",
@@ -30,6 +33,26 @@ export const COMPANY_INVOICE_PROFILES: Record<string, CompanyInvoiceProfile> = {
 
 export function getCompanyInvoiceProfile(slug: string) {
   return COMPANY_INVOICE_PROFILES[slug] || aryanProfile;
+}
+
+export async function getBillInvoiceIssuer(slug: string, fallbackName: string, originBranchId: string | null) {
+  const profile = getCompanyInvoiceProfile(slug);
+  const name = slug === "aryan-gold" ? "ARYAN GOLD PRIVATE LIMITED" : fallbackName;
+  if (!originBranchId) return { ...profile, name };
+
+  const normalizedBranchId = originBranchId.trim().toUpperCase();
+  const branch = (await getAttendanceBranches()).find(item => item.branchId.trim().toUpperCase() === normalizedBranchId);
+  if (!branch) throw new Error(`Branch ${originBranchId} is unavailable in the branch directory.`);
+
+  const addressParts = [branch.address.trim()];
+  const appendIfMissing = (value: string) => {
+    const normalized = value.trim();
+    if (normalized && !addressParts.join(", ").toLowerCase().includes(normalized.toLowerCase())) addressParts.push(normalized);
+  };
+  appendIfMissing(branch.city);
+  appendIfMissing(branch.pincode);
+  appendIfMissing(branch.state);
+  return { ...profile, name, address: addressParts.filter(Boolean).join(", ") };
 }
 
 export const COMPANY_SEALS: Record<string, string> = {

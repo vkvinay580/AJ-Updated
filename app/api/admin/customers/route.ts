@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
   const verificationNotes = cleanText(form.get("verificationNotes"), 1000);
   if (phone.length !== 10) return apiError("Enter a valid 10-digit phone number.");
   if (name.length < 2) return apiError("Customer name is required.");
+  if (!/^\d{6}$/.test(postalCode)) return apiError("Postal code must contain exactly 6 digits.");
   if (!/^\d{12}$/.test(aadhaar) && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)) return apiError("A valid Aadhaar or PAN is required.");
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return apiError("Enter a valid email address.");
   if (gstin && !/^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]$/.test(gstin)) return apiError("Enter a valid 15-character GSTIN.");

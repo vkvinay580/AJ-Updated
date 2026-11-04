@@ -10,7 +10,7 @@ const columns = [
   "description", "hsn_code", "purity", "metal", "gross_weight_grams", "stone_weight_grams", "rate_per_gram", "making_other", "cgst_rate", "sgst_rate", "adjustment", "notes",
 ] as const;
 const requiredColumns = new Set<(typeof columns)[number]>([
-  "import_reference", "customer_name", "phone", "aadhaar", "pan", "transaction_type", "payment_method",
+  "import_reference", "customer_name", "phone", "postal_code", "aadhaar", "pan", "transaction_type", "payment_method",
   "account_number", "ifsc_code", "upi_id", "cheque_number", "card_number",
   "description", "hsn_code", "metal", "gross_weight_grams", "rate_per_gram",
 ]);
@@ -41,6 +41,7 @@ function validate(rows: ImportRow[]) {
     const phone = cleanPhone(first.phone), aadhaar = first.aadhaar.replace(/\D/g, ""), pan = first.pan.toUpperCase();
     if (cleanText(first.customer_name, 120).length < 2) errors.push("Customer name is required");
     if (phone.length !== 10) errors.push("Phone must contain 10 digits");
+    if (!/^\d{6}$/.test(first.postal_code)) errors.push("Postal code must contain exactly 6 digits");
     if (!/^\d{12}$/.test(aadhaar) && !/^[A-Z]{5}\d{4}[A-Z]$/.test(pan)) errors.push("Enter a valid Aadhaar or PAN");
     if (first.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(first.email)) errors.push("Email is invalid");
     if (first.bill_date && !/^\d{4}-\d{2}-\d{2}$/.test(first.bill_date)) errors.push("Bill date must be YYYY-MM-DD");
@@ -88,8 +89,8 @@ export async function GET(request:NextRequest) {
   sheet.getRow(1).font={bold:false,color:{argb:"FFFFFFFF"}};
   columns.forEach((name,index)=>{sheet.getRow(1).getCell(index+1).font={bold:requiredColumns.has(name),color:{argb:"FFFFFFFF"}}});
   sheet.getRow(1).fill={type:"pattern",pattern:"solid",fgColor:{argb:"FF9B6D13"}}; sheet.views=[{state:"frozen",ySplit:1}]; sheet.autoFilter={from:"A1",to:`${sheet.getColumn(columns.length).letter}1`};
-  sheet.addRow({import_reference:"BILL-001",bill_date:new Date().toISOString().slice(0,10),customer_name:"Sample Customer",phone:"9876543210",email:"",aadhaar:"123412341234",pan:"",transaction_type:"sale",payment_method:"cash",description:"Gold Ornament",hsn_code:"711319",purity:"22K / 916",metal:"gold",gross_weight_grams:10,stone_weight_grams:0,rate_per_gram:7000,making_other:500,cgst_rate:1.5,sgst_rate:1.5,adjustment:0,notes:"Delete this sample row"});
-  const instructions=workbook.addWorksheet("Instructions"); instructions.addRows([["Bill import instructions"],["One row equals one bill item. Use the same import_reference for multiple items on one bill."],["Required: reference, customer name, 10-digit phone, any one valid Aadhaar/PAN, transaction/payment details, description, HSN, metal, weights and rate."],["Customer photos and KYC document files are optional and are not included in this spreadsheet."],["Invoice numbers are generated automatically only after you verify and import."],["Dates use YYYY-MM-DD. Payment methods: cash, upi, bank_transfer, card, cheque."]]); instructions.getColumn(1).width=120;
+  sheet.addRow({import_reference:"BILL-001",bill_date:new Date().toISOString().slice(0,10),customer_name:"Sample Customer",phone:"9876543210",email:"",postal_code:"560013",aadhaar:"123412341234",pan:"",transaction_type:"sale",payment_method:"cash",description:"Gold Ornament",hsn_code:"711319",purity:"22K / 916",metal:"gold",gross_weight_grams:10,stone_weight_grams:0,rate_per_gram:7000,making_other:500,cgst_rate:1.5,sgst_rate:1.5,adjustment:0,notes:"Delete this sample row"});
+  const instructions=workbook.addWorksheet("Instructions"); instructions.addRows([["Bill import instructions"],["One row equals one bill item. Use the same import_reference for multiple items on one bill."],["Required: reference, customer name, 10-digit phone, 6-digit postal code, any one valid Aadhaar/PAN, transaction/payment details, description, HSN, metal, weights and rate."],["Customer photos and KYC document files are optional and are not included in this spreadsheet."],["Invoice numbers are generated automatically only after you verify and import."],["Dates use YYYY-MM-DD. Payment methods: cash, upi, bank_transfer, card, cheque."]]); instructions.getColumn(1).width=120;
   const buffer=await workbook.xlsx.writeBuffer();
   return new NextResponse(Buffer.from(buffer),{headers:{"Content-Type":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","Content-Disposition":`attachment; filename="bill-import-template.xlsx"`}});
 }
@@ -112,7 +113,7 @@ export async function POST(request:NextRequest) {
     const created=await transaction(async connection=>{
       const results:{billId:number;billNumber:string;reference:string}[]=[];
       for(const bill of bills){const first=bill.rows[0], phone=cleanPhone(first.phone); let customer=await one<RowDataPacket & {id:number}>("SELECT id FROM customers WHERE company_id=? AND phone=?",[session.companyId,phone],connection);
-        if(!customer){const c=await execute(`INSERT INTO customers (company_id,phone,name,email,address,city,state,gstin,state_code,place_of_supply,postal_code,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,[session.companyId,phone,cleanText(first.customer_name,120),cleanText(first.email,190)||null,cleanText(first.address,500)||null,cleanText(first.city,100)||null,cleanText(first.state,100)||null,cleanText(first.gstin,15).toUpperCase()||null,cleanText(first.state_code,2)||null,cleanText(first.place_of_supply,100)||cleanText(first.state,100)||null,cleanText(first.postal_code,10)||null,session.adminId],connection); customer={id:c.insertId} as RowDataPacket & {id:number};
+        if(!customer){const c=await execute(`INSERT INTO customers (company_id,phone,name,email,address,city,state,gstin,state_code,place_of_supply,postal_code,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,[session.companyId,phone,cleanText(first.customer_name,120),cleanText(first.email,190)||null,cleanText(first.address,500)||null,cleanText(first.city,100)||null,cleanText(first.state,100)||null,cleanText(first.gstin,15).toUpperCase()||null,cleanText(first.state_code,2)||null,cleanText(first.place_of_supply,100)||cleanText(first.state,100)||null,cleanText(first.postal_code,6),session.adminId],connection); customer={id:c.insertId} as RowDataPacket & {id:number};
           const aadhaar=first.aadhaar.replace(/\D/g,''), pan=first.pan.toUpperCase(), kind=/^\d{12}$/.test(aadhaar)?'aadhaar':'pan', number=kind==='aadhaar'?aadhaar:pan;
           await execute(`INSERT INTO kyc_records (customer_id,company_id,document_type,number_encrypted,number_hash,number_last4,created_by) VALUES (?,?,?,?,?,?,?)`,[customer.id,session.companyId,kind,encryptSensitive(number),stableHash(number),number.slice(-4),session.adminId],connection);
         }
