@@ -8,6 +8,7 @@ import { addFundEntry, lockFundLedger } from "@/lib/branch-ledger";
 import { businessAuthenticated } from "@/lib/business-actor";
 import { encryptSensitive, execute, one, rows, transaction } from "@/lib/db";
 import { goldPurityCode } from "@/lib/gold-rates";
+import { invoiceStateCode, nextInvoiceNumber } from "@/lib/invoice-number";
 
 type ItemInput = { metal?: unknown; description?: unknown; itemDescription?: unknown; hsnCode?: unknown; purity?: unknown; grossWeightGrams?: unknown; stoneWeightGrams?: unknown; netWeightGrams?: unknown; weightGrams?: unknown; ratePerGram?: unknown; making?: unknown };
 type PaymentInput = { method?: unknown; amount?: unknown; accountNumber?: unknown; ifscCode?: unknown; upiId?: unknown; chequeNumber?: unknown; cardNumber?: unknown };
@@ -140,20 +141,18 @@ export async function POST(request: NextRequest) {
       const cashPaymentPaise = normalizedPayments.filter(payment => payment.method === "cash").reduce((sum, payment) => sum + payment.amountPaise, 0);
       const storedPaymentMethod = normalizedPayments.length > 1 ? "split" : normalizedPayments[0].method;
       const primaryPayment = normalizedPayments[0];
-      const company = await one<RowDataPacket & { prefix: string }>("SELECT invoice_prefix AS prefix FROM companies WHERE id = ? FOR UPDATE", [session.companyId], connection);
-      if (!company) throw new Error("Company configuration not found.");
-      const now = new Date(), calendarYear = now.getUTCFullYear(), financialYear = now.getUTCMonth() >= 3 ? calendarYear : calendarYear - 1;
-      await execute("INSERT IGNORE INTO invoice_sequences (company_id, invoice_year, last_number) VALUES (?, ?, 0)", [session.companyId, financialYear], connection);
-      const sequence = await one<RowDataPacket & { lastNumber: number }>("SELECT last_number AS lastNumber FROM invoice_sequences WHERE company_id = ? AND invoice_year = ? FOR UPDATE", [session.companyId, financialYear], connection);
-      const nextNumber = Number(sequence?.lastNumber || 0) + 1;
-      await execute("UPDATE invoice_sequences SET last_number = ? WHERE company_id = ? AND invoice_year = ?", [nextNumber, session.companyId, financialYear], connection);
-      const financialYearCode = `${String(financialYear).slice(-2)}${String(financialYear + 1).slice(-2)}`;
-      const billNumber = `${company.prefix}/${financialYearCode}/${String(nextNumber).padStart(2, "0")}`;
       const billDate = new Date().toISOString().slice(0, 10);
+      const originStateCode = invoiceStateCode(session.branchState);
+      const billNumber = await nextInvoiceNumber({
+        companyId: session.companyId,
+        stateCode: originStateCode,
+        invoiceDate: billDate,
+        connection,
+      });
       const result = await execute(`INSERT INTO bills
-        (company_id, customer_id, bill_number, transaction_type, bill_date, subtotal_paise, tax_paise, cgst_paise, sgst_paise, cgst_rate_bps, sgst_rate_bps, adjustment_paise, total_paise, payment_method, account_number, ifsc_code, upi_id, cheque_number, card_number, ornament_image_path, signature_image_path, notes, release_place, release_amount_paise, origin_branch_id, created_by_employee_id, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [session.companyId, customerId, billNumber, transactionType, billDate, subtotalPaise, taxPaise, cgstPaise, sgstPaise, Math.round(cgstRate * 100), Math.round(sgstRate * 100), adjustmentPaise, totalPaise, storedPaymentMethod, normalizedPayments.length === 1 && primaryPayment.method === "bank_transfer" ? encryptSensitive(primaryPayment.accountNumber) : null, normalizedPayments.length === 1 && primaryPayment.method === "bank_transfer" ? primaryPayment.ifscCode : null, normalizedPayments.length === 1 && primaryPayment.method === "upi" ? primaryPayment.upiId : null, normalizedPayments.length === 1 && primaryPayment.method === "cheque" ? primaryPayment.chequeNumber : null, normalizedPayments.length === 1 && primaryPayment.method === "card" ? encryptSensitive(primaryPayment.cardNumber) : null, ornamentImagePath, signatureImagePath, notes || null, pledgeId > 0 ? releasePlace : null, pledgeId > 0 ? releaseAmountPaise : null, session.branchId, session.employeeId, session.adminId], connection);
+        (company_id, customer_id, bill_number, transaction_type, bill_date, subtotal_paise, tax_paise, cgst_paise, sgst_paise, cgst_rate_bps, sgst_rate_bps, adjustment_paise, total_paise, payment_method, account_number, ifsc_code, upi_id, cheque_number, card_number, ornament_image_path, signature_image_path, notes, release_place, release_amount_paise, origin_branch_id, origin_state_code, created_by_employee_id, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [session.companyId, customerId, billNumber, transactionType, billDate, subtotalPaise, taxPaise, cgstPaise, sgstPaise, Math.round(cgstRate * 100), Math.round(sgstRate * 100), adjustmentPaise, totalPaise, storedPaymentMethod, normalizedPayments.length === 1 && primaryPayment.method === "bank_transfer" ? encryptSensitive(primaryPayment.accountNumber) : null, normalizedPayments.length === 1 && primaryPayment.method === "bank_transfer" ? primaryPayment.ifscCode : null, normalizedPayments.length === 1 && primaryPayment.method === "upi" ? primaryPayment.upiId : null, normalizedPayments.length === 1 && primaryPayment.method === "cheque" ? primaryPayment.chequeNumber : null, normalizedPayments.length === 1 && primaryPayment.method === "card" ? encryptSensitive(primaryPayment.cardNumber) : null, ornamentImagePath, signatureImagePath, notes || null, pledgeId > 0 ? releasePlace : null, pledgeId > 0 ? releaseAmountPaise : null, session.branchId, originStateCode, session.employeeId, session.adminId], connection);
       const billId = result.insertId;
       for (const payment of normalizedPayments) await execute(`INSERT INTO bill_payments
         (bill_id,payment_method,amount_paise,reference_text,account_number,ifsc_code,upi_id,payment_status) VALUES (?,?,?,?,?,?,?,?)`,

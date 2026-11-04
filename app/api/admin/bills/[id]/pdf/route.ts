@@ -25,7 +25,7 @@ export async function GET(request:NextRequest,context:{params:Promise<{id:string
     if(operations.access){
       const admin=operations.access.session;
       session={companyId:admin.companyId,companySlug:admin.companySlug,companyName:admin.companyName,
-        companyShortName:admin.companyShortName,companyLogo:admin.companyLogo,adminId:admin.adminId,branchId:null,employeeId:null};
+        companyShortName:admin.companyShortName,companyLogo:admin.companyLogo,adminId:admin.adminId,branchId:null,branchState:"Karnataka",employeeId:null};
     }
   }
   if(!session)return error??apiError("Your session has expired.",401);

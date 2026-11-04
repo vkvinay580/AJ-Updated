@@ -1,8 +1,9 @@
 import ExcelJS from "exceljs";
 import { NextRequest, NextResponse } from "next/server";
-import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import type { RowDataPacket } from "mysql2/promise";
 import { apiError, authenticated, cleanPhone, cleanText, requestIp } from "@/lib/api";
 import { encryptSensitive, execute, one, stableHash, transaction } from "@/lib/db";
+import { nextInvoiceNumber } from "@/lib/invoice-number";
 
 const columns = [
   "import_reference", "bill_date", "customer_name", "phone", "email", "address", "city", "state", "postal_code", "gstin", "state_code", "place_of_supply",
@@ -71,17 +72,6 @@ function validate(rows: ImportRow[]) {
   return bills;
 }
 
-async function nextInvoice(companyId:number, connection:PoolConnection) {
-  const company=await one<RowDataPacket & {prefix:string}>("SELECT invoice_prefix AS prefix FROM companies WHERE id=? FOR UPDATE",[companyId],connection);
-  if(!company) throw new Error("Company configuration not found.");
-  const now=new Date(), year=now.getUTCMonth()>=3?now.getUTCFullYear():now.getUTCFullYear()-1;
-  await execute("INSERT IGNORE INTO invoice_sequences (company_id,invoice_year,last_number) VALUES (?,?,0)",[companyId,year],connection);
-  const sequence=await one<RowDataPacket & {lastNumber:number}>("SELECT last_number AS lastNumber FROM invoice_sequences WHERE company_id=? AND invoice_year=? FOR UPDATE",[companyId,year],connection);
-  const next=Number(sequence?.lastNumber||0)+1;
-  await execute("UPDATE invoice_sequences SET last_number=? WHERE company_id=? AND invoice_year=?",[next,companyId,year],connection);
-  return `${company.prefix}/${String(year).slice(-2)}${String(year+1).slice(-2)}/${String(next).padStart(2,'0')}`;
-}
-
 export async function GET(request:NextRequest) {
   const {error,session}=await authenticated(request); if(error||!session)return error;
   const workbook=new ExcelJS.Workbook(), sheet=workbook.addWorksheet("Bills");
@@ -117,8 +107,8 @@ export async function POST(request:NextRequest) {
           const aadhaar=first.aadhaar.replace(/\D/g,''), pan=first.pan.toUpperCase(), kind=/^\d{12}$/.test(aadhaar)?'aadhaar':'pan', number=kind==='aadhaar'?aadhaar:pan;
           await execute(`INSERT INTO kyc_records (customer_id,company_id,document_type,number_encrypted,number_hash,number_last4,created_by) VALUES (?,?,?,?,?,?,?)`,[customer.id,session.companyId,kind,encryptSensitive(number),stableHash(number),number.slice(-4),session.adminId],connection);
         }
-        const subtotal=bill.rows.reduce((sum,row)=>sum+Math.round(((Number(row.gross_weight_grams)-Number(row.stone_weight_grams||0))*Number(row.rate_per_gram)+Number(row.making_other||0))*100),0), type=first.transaction_type.toLowerCase()==='purchase'?'purchase':'sale', cgst=type==='sale'?Number(first.cgst_rate||0):0, sgst=type==='sale'?Number(first.sgst_rate||0):0, cgstPaise=Math.round(subtotal*cgst/100), sgstPaise=Math.round(subtotal*sgst/100), adjustment=amount(first.adjustment), total=subtotal+cgstPaise+sgstPaise+adjustment, payment=first.payment_method.toLowerCase(), billNumber=await nextInvoice(session.companyId,connection);
-        const result=await execute(`INSERT INTO bills (company_id,customer_id,bill_number,transaction_type,bill_date,subtotal_paise,tax_paise,cgst_paise,sgst_paise,cgst_rate_bps,sgst_rate_bps,adjustment_paise,total_paise,payment_method,account_number,ifsc_code,upi_id,cheque_number,card_number,notes,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,[session.companyId,customer.id,billNumber,type,first.bill_date||new Date().toISOString().slice(0,10),subtotal,cgstPaise+sgstPaise,cgstPaise,sgstPaise,Math.round(cgst*100),Math.round(sgst*100),adjustment,total,payment,payment==='bank_transfer'?encryptSensitive(first.account_number.replace(/\s/g,'')):null,payment==='bank_transfer'?first.ifsc_code.toUpperCase():null,payment==='upi'?first.upi_id:null,payment==='cheque'?first.cheque_number:null,payment==='card'?encryptSensitive(first.card_number.replace(/\D/g,'')):null,cleanText(first.notes,500)||null,session.adminId],connection);
+        const subtotal=bill.rows.reduce((sum,row)=>sum+Math.round(((Number(row.gross_weight_grams)-Number(row.stone_weight_grams||0))*Number(row.rate_per_gram)+Number(row.making_other||0))*100),0), type=first.transaction_type.toLowerCase()==='purchase'?'purchase':'sale', cgst=type==='sale'?Number(first.cgst_rate||0):0, sgst=type==='sale'?Number(first.sgst_rate||0):0, cgstPaise=Math.round(subtotal*cgst/100), sgstPaise=Math.round(subtotal*sgst/100), adjustment=amount(first.adjustment), total=subtotal+cgstPaise+sgstPaise+adjustment, payment=first.payment_method.toLowerCase(), billDate=first.bill_date||new Date().toISOString().slice(0,10), billNumber=await nextInvoiceNumber({companyId:session.companyId,stateCode:"KA",invoiceDate:billDate,connection});
+        const result=await execute(`INSERT INTO bills (company_id,customer_id,bill_number,transaction_type,bill_date,subtotal_paise,tax_paise,cgst_paise,sgst_paise,cgst_rate_bps,sgst_rate_bps,adjustment_paise,total_paise,payment_method,account_number,ifsc_code,upi_id,cheque_number,card_number,notes,origin_state_code,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,[session.companyId,customer.id,billNumber,type,billDate,subtotal,cgstPaise+sgstPaise,cgstPaise,sgstPaise,Math.round(cgst*100),Math.round(sgst*100),adjustment,total,payment,payment==='bank_transfer'?encryptSensitive(first.account_number.replace(/\s/g,'')):null,payment==='bank_transfer'?first.ifsc_code.toUpperCase():null,payment==='upi'?first.upi_id:null,payment==='cheque'?first.cheque_number:null,payment==='card'?encryptSensitive(first.card_number.replace(/\D/g,'')):null,cleanText(first.notes,500)||null,"KA",session.adminId],connection);
         for(const row of bill.rows){const gross=Math.round(Number(row.gross_weight_grams)*1000),stone=Math.round(Number(row.stone_weight_grams||0)*1000),rate=amount(row.rate_per_gram),making=amount(row.making_other),line=Math.round((gross-stone)/1000*rate+making);await execute(`INSERT INTO bill_items (bill_id,description,hsn_code,purity,metal,gross_weight_mg,stone_weight_mg,weight_mg,rate_paise_per_gram,making_paise,amount_paise) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,[result.insertId,cleanText(row.description,190),row.hsn_code,cleanText(row.purity,30)||null,row.metal.toLowerCase(),gross,stone,gross-stone,rate,making,line],connection)}
         await execute("INSERT INTO audit_logs (admin_id,company_id,action,entity_type,entity_id,ip_address) VALUES (?,?, 'bill_imported','bill',?,?)",[session.adminId,session.companyId,result.insertId,requestIp(request)],connection); results.push({billId:result.insertId,billNumber,reference:bill.reference});
       } return results;

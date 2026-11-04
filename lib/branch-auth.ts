@@ -13,6 +13,7 @@ export type BranchSession = {
   sessionId: number;
   branchId: string;
   branchName: string;
+  branchState: string;
   employeeId: string;
   employeeName: string;
 };
@@ -20,7 +21,9 @@ export type BranchSession = {
 type BranchSessionRow = BranchSession & RowDataPacket;
 const digest = (token: string) => createHash("sha256").update(token).digest("hex");
 
-export async function createBranchSession(data: Omit<BranchSession, "sessionId">) {
+export async function createBranchSession(
+  data: Omit<BranchSession, "sessionId" | "branchState">,
+) {
   const token = randomBytes(32).toString("base64url");
   const expires = new Date(Date.now() + SESSION_HOURS * 60 * 60 * 1000);
   await execute("DELETE FROM branch_sessions WHERE expires_at <= UTC_TIMESTAMP()");
@@ -52,7 +55,14 @@ export async function getBranchSession(): Promise<BranchSession | null> {
   if (branchId !== row.branchId || branchName !== row.branchName) {
     await execute("UPDATE branch_sessions SET branch_id=?,branch_name=? WHERE id=?", [branchId, branchName, Number(row.sessionId)]);
   }
-  return { sessionId: Number(row.sessionId), branchId, branchName, employeeId: row.employeeId, employeeName: row.employeeName };
+  return {
+    sessionId: Number(row.sessionId),
+    branchId,
+    branchName,
+    branchState: context.branch.state,
+    employeeId: row.employeeId,
+    employeeName: row.employeeName,
+  };
 }
 
 export async function requireBranchSession() {

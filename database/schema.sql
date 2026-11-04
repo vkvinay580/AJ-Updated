@@ -326,6 +326,7 @@ CREATE TABLE IF NOT EXISTS bills (
   release_place VARCHAR(190) NULL,
   release_amount_paise BIGINT UNSIGNED NULL,
   origin_branch_id VARCHAR(100) NULL,
+  origin_state_code CHAR(2) NOT NULL DEFAULT 'KA',
   created_by_employee_id VARCHAR(100) NULL,
   created_by INT UNSIGNED NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -337,9 +338,10 @@ CREATE TABLE IF NOT EXISTS bills (
 
 CREATE TABLE IF NOT EXISTS invoice_sequences (
   company_id INT UNSIGNED NOT NULL,
+  state_code CHAR(2) NOT NULL,
   invoice_year SMALLINT UNSIGNED NOT NULL,
   last_number INT UNSIGNED NOT NULL DEFAULT 0,
-  PRIMARY KEY (company_id, invoice_year),
+  PRIMARY KEY (company_id, state_code, invoice_year),
   CONSTRAINT fk_sequence_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
