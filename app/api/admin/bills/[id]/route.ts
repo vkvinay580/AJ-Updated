@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import type { RowDataPacket } from "mysql2";
 import { apiError, authenticated, requestIp } from "@/lib/api";
 import { execute, one, rows, transaction } from "@/lib/db";
-import { getBillInvoiceIssuer, getCompanySeal } from "@/lib/company-invoice";
+import { getBillInvoiceIssuer } from "@/lib/company-invoice";
+
+const lastFour = (value: unknown) => {
+  const digits = String(value ?? "").replace(/\D/g, "").slice(-4);
+  return digits.length === 4 ? digits : "";
+};
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { error, session } = await authenticated(request);
@@ -17,11 +22,13 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     c.email AS customerEmail, c.address AS customerAddress, c.city AS customerCity, c.state AS customerState,
     c.gstin AS customerGstin, c.state_code AS customerStateCode, c.place_of_supply AS placeOfSupply,
     c.postal_code AS customerPostalCode, c.customer_image_path IS NOT NULL AS hasCustomerImage,
-    (SELECT number_last4 FROM kyc_records WHERE customer_id=c.id AND company_id=c.company_id AND document_type='aadhaar' LIMIT 1) AS aadhaarLast4,
-    (SELECT number_last4 FROM kyc_records WHERE customer_id=c.id AND company_id=c.company_id AND document_type='pan' LIMIT 1) AS panLast4
+    (SELECT number_last4 FROM kyc_records WHERE customer_id=c.id AND company_id=c.company_id AND document_type='aadhaar' ORDER BY id DESC LIMIT 1) AS aadhaarLast4,
+    (SELECT number_last4 FROM kyc_records WHERE customer_id=c.id AND company_id=c.company_id AND document_type='pan' ORDER BY id DESC LIMIT 1) AS panLast4
     FROM bills b JOIN customers c ON c.id = b.customer_id AND c.company_id = b.company_id
     WHERE b.id = ? AND b.company_id = ?`, [id, session.companyId]);
   if (!bill) return apiError("Bill not found.", 404);
+  bill.aadhaarLast4 = lastFour(bill.aadhaarLast4);
+  bill.panLast4 = lastFour(bill.panLast4);
   let issuer;
   try { issuer = await getBillInvoiceIssuer(session.companySlug, session.companyName, bill.originBranchId ? String(bill.originBranchId) : null); }
   catch (caught) { return apiError(caught instanceof Error ? caught.message : "Unable to load the invoice address.", 502); }
@@ -44,7 +51,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     const totalRateBps = Number(bill.subtotalPaise) ? Math.round(Number(bill.taxPaise) * 10000 / Number(bill.subtotalPaise)) : 0;
     bill.cgstRateBps = Math.floor(totalRateBps / 2); bill.sgstRateBps = totalRateBps - Number(bill.cgstRateBps);
   }
-  return NextResponse.json({ bill, items, payments, company: { ...issuer, shortName: session.companyShortName, logo: session.companyLogo, seal: getCompanySeal(session.companySlug) } });
+  return NextResponse.json({ bill, items, payments, company: { ...issuer, shortName: session.companyShortName, logo: session.companyLogo } });
 }
 
 export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
